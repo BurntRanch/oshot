@@ -40,12 +40,14 @@ enum class SavingOp;
 template <typename T = bool>
 struct Ok
 {
+    using value_type = T;
     T value;
 };
 
 template <typename E = std::string>
 struct Err
 {
+    using value_type = E;
     E value;
 };
 
@@ -74,6 +76,30 @@ public:
     E&       error() { return std::get<E>(value); }
     const T& get() const { return std::get<T>(value); }
     const E& error() const { return std::get<E>(value); }
+
+    template <typename U = T, typename = typename U::value_type>
+    typename U::value_type& get_v()
+    {
+        return std::get<T>(value).value;
+    }
+
+    template <typename U = T, typename = typename U::value_type>
+    const typename U::value_type& get_v() const
+    {
+        return std::get<T>(value).value;
+    }
+
+    template <typename U = E, typename = typename U::value_type>
+    typename U::value_type& error_v()
+    {
+        return std::get<E>(value).value;
+    }
+
+    template <typename U = E, typename = typename U::value_type>
+    const typename U::value_type& error_v() const
+    {
+        return std::get<E>(value).value;
+    }
 };
 
 // custom structs for fmt::format

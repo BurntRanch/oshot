@@ -13,7 +13,6 @@
 #include "clipboard.hpp"
 #include "config.hpp"
 #include "dotenv.h"
-#include "fmt/compile.h"
 #include "fmt/format.h"
 #include "frozen/string.h"
 #include "langs.hpp"
@@ -442,6 +441,8 @@ fs::path get_config_dir()
 
 fs::path get_font_path(const std::string& font)
 {
+    fs::path font_path(font);
+
 #ifdef _WIN32
     static constexpr std::array<std::string_view, 2> default_search_paths = {
         "C:\\Windows\\Fonts\\",
@@ -456,14 +457,14 @@ fs::path get_font_path(const std::string& font)
     };
 #endif
 
-    if (fs::path(font).is_absolute())
-        return font;
+    if (font_path.is_absolute())
+        return font_path;
 
     // Direct join (fast)
     for (const std::string_view root_sv : default_search_paths)
     {
         const fs::path& root      = expand_var(std::string(root_sv));
-        const fs::path& candidate = root / font;
+        const fs::path& candidate = root / font_path;
         std::error_code ec;
         if (fs::exists(candidate, ec) && !ec)
             return candidate;
@@ -491,7 +492,7 @@ fs::path get_font_path(const std::string& font)
             if (!e.is_regular_file(ec))
                 continue;
 
-            if (e.path().filename() == font)
+            if (e.path().filename() == font_path)
                 return e.path();
         }
     }

@@ -191,7 +191,7 @@ Result<> ScreenshotTool::Start()
     }
 
     if (!result.ok())
-        return Err("Failed to do data with screenshot: " + result.error().value);
+        return Err("Failed to do data with screenshot: " + result.error_v());
 
     m_screenshot = std::move(result.get());
     m_tool_thickness.fill(3.0f);
@@ -208,9 +208,10 @@ Result<> ScreenshotTool::StartWindow()
 
     const Result<void*>& res = CreateTexture(m_texture_id, m_screenshot.view(), m_screenshot.w, m_screenshot.h);
     if (!res.ok())
-        return Err("Failed create openGL texture: " + res.error().value);
+        return Err("Failed create openGL texture: " + res.error_v());
 
-    m_texture_id = res.get();
+    m_texture_id      = res.get();
+    m_inputs.ann_font = g_config->File.font;
     fit_to_screen(m_screenshot);
 
     // Since the creation of the screenshot texture was fine, suppose the other too
@@ -1043,7 +1044,7 @@ void ScreenshotTool::DrawOcrTools()
         const Result<>& res = m_ocr_api.Configure(ocr_path.c_str(), ocr_model.c_str());
         if (!res.ok())
         {
-            SetError(FailedToInitOcr, res.error().value);
+            SetError(FailedToInitOcr, res.error_v());
         }
         else
         {
@@ -1188,7 +1189,7 @@ void ScreenshotTool::DrawTranslationTools()
         const Result<std::string>& translation = translator->Translate(lang_from, lang_to, m_inputs.translate_text);
         if (!translation.ok())
         {
-            SetError(FailedTranslation, translation.error().value);
+            SetError(FailedTranslation, translation.error_v());
         }
         else
         {
@@ -1257,7 +1258,7 @@ void ScreenshotTool::DrawBarDecodeTools()
         const Result<zbar_result_t>& scan = m_zbar_api.ExtractTextsCapture(GetFinalImage());
         if (!scan.ok())
         {
-            SetError(FailedToExtractBarCode, scan.error().value);
+            SetError(FailedToExtractBarCode, scan.error_v());
         }
         else
         {
@@ -1426,7 +1427,7 @@ void ScreenshotTool::DrawAnnotations()
 
     auto draw_text = [&](const annotation_t& ann, const ImVec2& p1) {
         const float font_size = ann.thickness > 8.0f ? ann.thickness : ImGui::GetFontSize();
-        ImFont* font = CacheAndGetFont(get_font_path(m_inputs.ann_font), font_size);
+        ImFont*     font      = CacheAndGetFont(get_font_path(m_inputs.ann_font), font_size);
         draw_list->AddText(font, font_size, p1, ann.color, ann.text.c_str());
     };
 

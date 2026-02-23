@@ -1945,24 +1945,20 @@ void ScreenshotTool::UpdateWindowBg()
 
 ImFont* ScreenshotTool::CacheAndGetFont(const std::string& font_path, const float font_size)
 {
-    ImFont* font = nullptr;
     if (font_path.empty())
         return ImGui::GetDefaultFont();
 
-    auto it = m_font_cache.find(font_path);
+    std::pair key(font_path, font_size);
+    auto      it = m_font_cache.find(key);
     if (it != m_font_cache.end())
-    {
-        font = it->second.font;
-    }
-    else
-    {
-        font =
-            m_io.Fonts->AddFontFromFileTTF(font_path.c_str(), font_size, nullptr, m_io.Fonts->GetGlyphRangesDefault());
+        return it->second.font;
 
-        m_font_cache[font_path] = { font_path, font, true };
-        if (font)
-            m_io.Fonts->Build();
-    }
+    ImFont* font =
+        m_io.Fonts->AddFontFromFileTTF(font_path.c_str(), font_size, nullptr, m_io.Fonts->GetGlyphRangesDefault());
+
+    m_font_cache[key] = { font_path, font, true };
+    if (font)
+        m_io.Fonts->Build();
 
     return font;
 }
@@ -1971,13 +1967,9 @@ ImFont* ScreenshotTool::GetFontForLanguage(const std::string& lang_code)
 {
     const fs::path& font_path = get_lang_font_path(lang_code);
     if (font_path.empty())
-    {
-        // Cache null result
-        m_font_cache[lang_code] = { "", nullptr, true };
         return ImGui::GetDefaultFont();
-    }
 
-    return CacheAndGetFont(font_path, ImGui::GetFontSize());
+    return CacheAndGetFont(font_path.string(), ImGui::GetFontSize());
 }
 
 Result<void*> ScreenshotTool::CreateTexture(void* tex, std::span<const uint8_t> data, int w, int h)

@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <deque>
 #include <functional>
+#include <map>
 #include <unordered_map>
 #include <utility>
 
@@ -193,7 +194,7 @@ private:
     ImVec2 m_image_end;
 
     std::unordered_map<ErrorFlag, std::string>                     m_err_texts;
-    std::unordered_map<std::string, font_cache_t>                  m_font_cache;
+    std::map<std::pair<std::string, float>, font_cache_t>          m_font_cache;
     std::function<void()>                                          m_on_cancel;
     std::function<void(SavingOp, const Result<capture_result_t>&)> m_on_complete;
 

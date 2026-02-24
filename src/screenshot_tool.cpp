@@ -133,6 +133,34 @@ static void draw_input_text_folder(const char*                  label,
     draw_input_text_path(label, input_id, false, nullptr, 0, func, path);
 }
 
+static HandleHovered flip_handle_x(HandleHovered handle)
+{
+    switch (handle)
+    {
+        case HandleHovered::TopLeft:     return HandleHovered::TopRight;
+        case HandleHovered::TopRight:    return HandleHovered::TopLeft;
+        case HandleHovered::BottomLeft:  return HandleHovered::BottomRight;
+        case HandleHovered::BottomRight: return HandleHovered::BottomLeft;
+        case HandleHovered::Left:        return HandleHovered::Right;
+        case HandleHovered::Right:       return HandleHovered::Left;
+        default:                         return handle;
+    }
+}
+
+static HandleHovered flip_handle_y(HandleHovered handle)
+{
+    switch (handle)
+    {
+        case HandleHovered::TopLeft:     return HandleHovered::BottomLeft;
+        case HandleHovered::TopRight:    return HandleHovered::BottomRight;
+        case HandleHovered::BottomLeft:  return HandleHovered::TopLeft;
+        case HandleHovered::BottomRight: return HandleHovered::TopRight;
+        case HandleHovered::Top:         return HandleHovered::Bottom;
+        case HandleHovered::Bottom:      return HandleHovered::Top;
+        default:                         return handle;
+    }
+}
+
 static bool ui_blocks_selection()
 {
     static ImGuiWindow* overlay_window = nullptr;
@@ -408,13 +436,32 @@ void ScreenshotTool::HandleResizeInput()
         case HandleHovered::Bottom: m_selection.end.y = m_drag_start_selection.end.y + delta.y; break;
         case HandleHovered::Left:   m_selection.start.x = m_drag_start_selection.start.x + delta.x; break;
         case HandleHovered::Right:  m_selection.end.x = m_drag_start_selection.end.x + delta.x; break;
-        case HandleHovered::Move:  // Move the entire selection
+        case HandleHovered::Move:
             m_selection.start.x = m_drag_start_selection.start.x + delta.x;
             m_selection.start.y = m_drag_start_selection.start.y + delta.y;
             m_selection.end.x   = m_drag_start_selection.end.x + delta.x;
             m_selection.end.y   = m_drag_start_selection.end.y + delta.y;
             break;
         default: break;
+    }
+
+    // When a handle is dragged past the opposite edge, the selection inverts.
+    // Normalize it by swapping coordinates, flipping the active handle, and
+    // resetting the drag anchor so the delta stays correct next frame.
+    if (m_selection.start.x > m_selection.end.x)
+    {
+        std::swap(m_selection.start.x, m_selection.end.x);
+        m_dragging_handle      = flip_handle_x(m_dragging_handle);
+        m_drag_start_mouse     = mouse_pos;
+        m_drag_start_selection = m_selection;
+    }
+
+    if (m_selection.start.y > m_selection.end.y)
+    {
+        std::swap(m_selection.start.y, m_selection.end.y);
+        m_dragging_handle      = flip_handle_y(m_dragging_handle);
+        m_drag_start_mouse     = mouse_pos;
+        m_drag_start_selection = m_selection;
     }
 }
 

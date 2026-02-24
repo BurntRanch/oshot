@@ -1433,7 +1433,7 @@ void ScreenshotTool::DrawAnnotations()
 
     auto draw_text = [&](const annotation_t& ann, const ImVec2& p1) {
         const float font_size = ann.thickness > 8.0f ? ann.thickness : ImGui::GetFontSize();
-        ImFont*     font      = CacheAndGetFont(get_font_path(m_inputs.ann_font), font_size);
+        ImFont*     font      = CacheAndGetFont(get_font_path(m_inputs.ann_font).string(), font_size);
         draw_list->AddText(font, font_size, p1, ann.color, ann.text.c_str());
     };
 
@@ -1775,7 +1775,7 @@ capture_result_t ScreenshotTool::GetFinalImage()
                 // fall back to a sensible default if it's at the tool default of 3px
                 const float font_size = ann.thickness < 8.0f ? 8.0f : ann.thickness;
 
-                ImFont* font = CacheAndGetFont(get_font_path(m_inputs.ann_font), font_size);
+                ImFont* font = CacheAndGetFont(get_font_path(m_inputs.ann_font).string(), font_size);
                 if (!font || !font->OwnerAtlas)
                     break;
 

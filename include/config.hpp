@@ -42,8 +42,9 @@ public:
         std::string lang_from;
         std::string lang_to;
         std::string font;
-        int         delay          = -1;
-        bool        allow_ocr_edit = false;
+        int         delay           = -1;
+        bool        allow_ocr_edit  = false;
+        bool        show_text_tools = true;
 
         std::unordered_map<std::string, std::string> lang_fonts_paths;
     } File;
@@ -177,6 +178,10 @@ lang-to = "en-us"
 
 # Allow the extracted output to be editable
 allow-edit = false
+
+# Display the text tools (OCR, translation, Bar/QR code scan)
+#  by default
+show-text-tools = true
 
 # Default font (absolute path or just name) for the whole application.
 # Leave/Make it empty, or commment it, to use ImGUI default font.

@@ -26,6 +26,7 @@ enum class ToolType : size_t
     Line,
     Text,
     Pencil,
+    ToggleTextTools,
     Count
 };
 
@@ -187,7 +188,8 @@ private:
     selection_rect_t m_drag_start_selection;
 
     inputs_results_t m_inputs;
-    bool             m_is_selecting = false;
+    bool             m_show_text_tools = true;
+    bool             m_is_selecting    = false;
 
     ImVec2 m_drag_start_mouse;
     ImVec2 m_image_origin;

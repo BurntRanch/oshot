@@ -231,6 +231,9 @@ Result<> ScreenshotTool::StartWindow()
     m_io    = ImGui::GetIO();
     m_state = ToolState::Selecting;
 
+    m_inputs.ann_font = g_config->File.font;
+    m_show_text_tools = g_config->File.show_text_tools;
+
     if (!g_is_clipboard_server)
         std::thread([] { g_sender->Start(6015); }).detach();
 
@@ -238,8 +241,7 @@ Result<> ScreenshotTool::StartWindow()
     if (!res.ok())
         return Err("Failed create openGL texture: " + res.error_v());
 
-    m_texture_id      = res.get();
-    m_inputs.ann_font = g_config->File.font;
+    m_texture_id = res.get();
     fit_to_screen(m_screenshot);
 
     // Since the creation of the screenshot texture was fine, suppose the other too
@@ -249,6 +251,8 @@ Result<> ScreenshotTool::StartWindow()
         CreateTexture(nullptr, ICON_RECT_FILLED_RGBA, ICON_RECT_FILLED_W, ICON_RECT_FILLED_H).get();
     tool_textures[idx(ToolType::CircleFilled)] =
         CreateTexture(nullptr, ICON_CIRCLE_FILLED_RGBA, ICON_CIRCLE_FILLED_W, ICON_CIRCLE_FILLED_H).get();
+    tool_textures[idx(ToolType::ToggleTextTools)] =
+        CreateTexture(nullptr, ICON_TEXT_TOOLS_RGBA, ICON_TEXT_TOOLS_W, ICON_TEXT_TOOLS_H).get();
 
     tool_textures[idx(ToolType::Line)]   = CreateTexture(nullptr, ICON_LINE_RGBA, ICON_LINE_W, ICON_LINE_H).get();
     tool_textures[idx(ToolType::Circle)] = CreateTexture(nullptr, ICON_CIRCLE_RGBA, ICON_CIRCLE_W, ICON_CIRCLE_H).get();
@@ -309,9 +313,9 @@ void ScreenshotTool::RenderOverlay()
     ImGui::End();
     ImGui::PopStyleVar();
 
-    if (m_state == ToolState::Selected)
+    if (m_state == ToolState::Selected && m_show_text_tools)
     {
-        ImGui::Begin("Text tools", nullptr, ImGuiWindowFlags_MenuBar);
+        ImGui::Begin("Text tools", &m_show_text_tools, ImGuiWindowFlags_MenuBar);
         DrawMenuItems();
         DrawOcrTools();
         DrawTranslationTools();
@@ -1460,6 +1464,11 @@ void ScreenshotTool::DrawAnnotationToolbar()
     DrawSetButton(ToolType::Text, "##icon_Text", tool_textures[idx(ToolType::Text)]);
     DrawSetButton(ToolType::Pencil, "##Pencil", tool_textures[idx(ToolType::Pencil)]);
 
+    if (!m_show_text_tools &&
+        ImGui::ImageButton("##ShowTextTools", tool_textures[idx(ToolType::ToggleTextTools)], ImVec2(24, 24)))
+        m_show_text_tools = true;
+
+    ImGui::SameLine();
     ImGui::Separator();
 
     ImGui::SameLine();
@@ -1787,7 +1796,8 @@ capture_result_t ScreenshotTool::GetFinalImage()
         switch (ann.type)
         {
             case ToolType::kNone:
-            case ToolType::Count: break;
+            case ToolType::Count:
+            case ToolType::ToggleTextTools: break;
 
             case ToolType::Line:
             case ToolType::Arrow:

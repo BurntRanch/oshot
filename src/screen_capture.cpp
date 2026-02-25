@@ -455,8 +455,7 @@ Result<capture_result_t> capture_full_screen_windows()
     com_ptr<IDXGIOutput>   output;
 
     bool found_output = false;
-    for (UINT ai = 0; factory->EnumAdapters1(ai, &adapter.reset_and_get_address()))
-        != DXGI_ERROR_NOT_FOUND; ++ai)
+    for (UINT ai = 0; factory->EnumAdapters1(ai, adapter.reset_and_get_address()) != DXGI_ERROR_NOT_FOUND; ++ai)
     {
         for (UINT oi = 0; adapter->EnumOutputs(oi, output.reset_and_get_address()) != DXGI_ERROR_NOT_FOUND; ++oi)
         {

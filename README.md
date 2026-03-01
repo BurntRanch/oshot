@@ -72,4 +72,7 @@ If when starting oshot, it starts to flick a screen black (or it won't launch), 
 
 If still errors, please open an [Issue](https://github.com/Toni500github/oshot/issues) and take a screenshot/paste the text of the error appearing in the console when executing oshot
 ## Usage
-https://github.com/user-attachments/assets/ac505de6-0818-4d67-bb51-064d86f1f970
+
+https://github.com/user-attachments/assets/8367490a-f7b0-4320-86e9-8ef8764a56b5
+
+<!--https://github.com/user-attachments/assets/ac505de6-0818-4d67-bb51-064d86f1f970-->

@@ -502,9 +502,13 @@ void ScreenshotTool::HandleAnnotationInput()
 
         if (m_is_text_placing)
         {
+            const float padding_y =
+                std::max(2.0f, (m_current_annotation.thickness - ImGui::GetTextLineHeight()) * 0.5f);
+
             ImGui::SetNextWindowPos(ImVec2(m_current_annotation.start.x, m_current_annotation.start.y));
             ImGui::SetNextWindowBgAlpha(0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, padding_y));
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
 
             ImGui::Begin("##text_input",
@@ -516,6 +520,9 @@ void ScreenshotTool::HandleAnnotationInput()
             if (ImGui::IsWindowAppearing())
                 ImGui::SetKeyboardFocusHere();
 
+            ImFont* ann_font = CacheAndGetFont(m_inputs.ann_font, m_current_annotation.thickness);
+            ImGui::PushFont(ann_font);
+
             if (ImGui::InputText("##text_ann", &m_current_annotation.text, ImGuiInputTextFlags_EnterReturnsTrue))
             {
                 if (!m_current_annotation.text.empty())
@@ -523,6 +530,8 @@ void ScreenshotTool::HandleAnnotationInput()
                 m_current_annotation = {};
                 m_is_text_placing    = false;
             }
+
+            ImGui::PopFont();
 
             if (ImGui::IsKeyPressed(ImGuiKey_Escape))
             {
@@ -532,6 +541,7 @@ void ScreenshotTool::HandleAnnotationInput()
 
             ImGui::End();
             ImGui::PopStyleColor();
+            ImGui::PopStyleVar();
             ImGui::PopStyleVar();
         }
         return;  // never fall through to the generic drag path

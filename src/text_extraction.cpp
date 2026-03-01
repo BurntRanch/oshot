@@ -102,9 +102,9 @@ static PIX* preprocess_pix(PIX* src)
     {
         PIX* scaled = pixScale(gray, 2.0f, 2.0f);
         if (scaled)
-        { 
+        {
             pixDestroy(&gray);
-            gray = scaled; 
+            gray = scaled;
         }
     }
 

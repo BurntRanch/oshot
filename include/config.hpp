@@ -39,8 +39,6 @@ public:
     {
         std::string ocr_path;
         std::string ocr_model;
-        std::string lang_from;
-        std::string lang_to;
         std::string font;
         int         delay           = -1;
         bool        allow_ocr_edit  = false;
@@ -170,33 +168,20 @@ ocr-model = "eng"
 # Doesn't affect if opening external image (i.e. -f flag)
 #delay = 200
 
-# Default from language codename translate
-lang-from = "auto"
-
-# Default to language codename translate
-lang-to = "en-us"
-
 # Allow the extracted output to be editable
 allow-edit = false
 
-# Display the text tools (OCR, translation, Bar/QR code scan)
+# Display the text tools (OCR, Bar/QR code scan)
 #  by default
 show-text-tools = true
 
 # Default font (absolute path or just name) for the whole application.
 # Leave/Make it empty, or commment it, to use ImGUI default font.
 font = "arial.ttf"
-
-# Translation-only
-# These sections are dedicated for being able to display languages with their appropriated fonts.
-# based on the language code, you can write a table (e.g [lang.en-us]) and
-# put a variable called "font" which can be an absolute path or just the name of the font.
-[lang.en-us]
-font = "DejaVuSans.ttf" # Or C:\\Windows\\Fonts\\DejaVuSans.ttf or ~/.fonts/DejaVuSans.ttf
 )#";
 
 inline constexpr std::string_view oshot_help = (R"(Usage: oshot [OPTIONS]...
-Lightweight Screenshot tool to extract and translate text on the fly.
+Lightweight Screenshot tool to extract text on the fly.
 
 GENERAL OPTIONS:
     -h, --help                  Print this help menu.
@@ -206,7 +191,6 @@ GENERAL OPTIONS:
     -d, --delay <MILLIS>        Delay the app before acquiring the screenshot by milliseconds.
                                 Won't affect if using the -f flag
 
-    -l, --list                  List all available translatable languages along side their codenames.
     -g, --gui                   Only launch the GUI
     -t, --tray                  Only launch system tray
     --debug                     Print debug statments

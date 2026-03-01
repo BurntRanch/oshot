@@ -44,8 +44,6 @@ void Config::LoadConfigFile(const std::string& filename)
 
     File.ocr_path        = GetValue<std::string>("default.ocr-path", "/usr/share/tessdata");
     File.ocr_model       = GetValue<std::string>("default.ocr-model", "eng");
-    File.lang_from       = GetValue<std::string>("default.lang-from", "auto");
-    File.lang_to         = GetValue<std::string>("default.lang-to", "en-us");
     File.font            = GetValue<std::string>("default.font", "");
     File.delay           = GetValue<int>("default.delay", -1);
     File.allow_ocr_edit  = GetValue<bool>("default.allow-edit-ocr", false);  // deprecated

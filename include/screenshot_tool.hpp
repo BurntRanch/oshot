@@ -73,9 +73,6 @@ enum ErrorFlag : size_t
     FailedToInitOcr,
     InvalidPath,
     InvalidModel,
-    FailedTranslation,
-    InvalidLangFrom,
-    InvalidLangTo,
     FailedToExtractBarCode,
     COUNT
 };
@@ -112,11 +109,7 @@ class ScreenshotTool
 {
 public:
     ScreenshotTool()
-        : m_io(dummy),
-          m_inputs{ .ocr_path     = g_config->File.ocr_path,
-                    .ocr_model    = g_config->File.ocr_model,
-                    .tl_lang_from = g_config->File.lang_from,
-                    .tl_lang_to   = g_config->File.lang_to }
+        : m_io(dummy), m_inputs{ .ocr_path = g_config->File.ocr_path, .ocr_model = g_config->File.ocr_model }
     {}
 
     Result<>          Start();
@@ -133,7 +126,6 @@ public:
     capture_result_t GetFinalImage();
 
     ImFont* CacheAndGetFont(const std::string& font_name, const float font_size);
-    ImFont* GetFontForLanguage(const std::string& lang_code);
 
     void RenderOverlay();
     void Cancel();
@@ -178,21 +170,12 @@ private:
         std::string ocr_path;
         std::string ocr_model;
         std::string ocr_text;
+        int         ocr_confidence = -1;
 
-        std::string tl_lang_from;
-        std::string tl_lang_to;
-        size_t      tl_index_from  = 0;
-        size_t      tl_index_to    = 0;
-        bool        tl_first_frame = true;
-        std::string tl_translated_text;
-        ImFont*     tl_font_from = nullptr;
-        ImFont*     tl_font_to   = nullptr;
-
-        std::string   to_translate_text;
         std::string   barcode_text;
-        std::string   ann_font;
-        int           ocr_confidence = -1;
         zbar_result_t zbar_scan_result;
+
+        std::string ann_font;
     };
 
     ImGuiIO&         m_io;
@@ -250,7 +233,6 @@ private:
     void DrawSelectionBorder();
 
     void DrawOcrTools();
-    void DrawTranslationTools();
     void DrawBarDecodeTools();
     void DrawAnnotationToolbar();
 

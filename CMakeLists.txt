@@ -67,7 +67,6 @@ else()
 endif()
 
 find_package(OpenGL REQUIRED)
-find_package(CURL REQUIRED)
 pkg_check_modules(TESSERACT REQUIRED tesseract)
 pkg_check_modules(LEPTONICA REQUIRED lept)
 pkg_check_modules(ZBAR REQUIRED zbar)
@@ -142,7 +141,6 @@ target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
         OpenGL::GL
-        CURL::libcurl
         ${GLFW_TARGET}
         ${TESSERACT_LIBRARIES}
         ${LEPTONICA_LIBRARIES}

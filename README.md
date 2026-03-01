@@ -1,6 +1,6 @@
 # oshot
 
-A simple and lightweight tool for extracting and translating text from a screenshot/image (on the fly)
+A simple and lightweight tool for extracting text from a screenshot/image (on the fly)
 
 ## Dependencies
 ### Linux

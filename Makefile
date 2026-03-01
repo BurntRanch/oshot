@@ -67,7 +67,7 @@ VERSION    	 = 0.3.0
 SRC	 	 = $(wildcard src/*.cpp)
 OBJ	 	 = $(SRC:.cpp=.o)
 LDFLAGS   	+= -L$(BUILDDIR) $(LTO_FLAGS)
-LDLIBS		+= $(wildcard $(BUILDDIR)/*.a) `pkg-config --static --libs glfw3 tesseract libcurl zbar`
+LDLIBS		+= $(wildcard $(BUILDDIR)/*.a) `pkg-config --static --libs glfw3 tesseract zbar`
 CXXFLAGS        += $(LTO_FLAGS) -fvisibility-inlines-hidden -fvisibility=hidden -Iinclude -Iinclude/libs -std=$(CXXSTD) $(VARS) -DVERSION=\"$(VERSION)\"
 
 all: imgui fmt tfd tpl clip tray getopt-port toml $(TARGET)

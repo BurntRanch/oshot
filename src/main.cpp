@@ -31,7 +31,6 @@
 #include "fmt/base.h"
 #include "fmt/compile.h"
 #include "getopt_port/getopt.h"
-#include "langs.hpp"
 #include "oshot_png.hpp"
 #include "screen_capture.hpp"
 #include "screenshot_tool.hpp"
@@ -100,13 +99,6 @@ static void help(bool invalid_opt = false)
     std::exit(invalid_opt);
 }
 
-static constexpr void print_languages()
-{
-    for (const auto& [code, name] : GOOGLE_TRANSLATE_LANGUAGES_ARRAY)
-        fmt::print(FMT_COMPILE("{}: {}\n"), name, code);
-    std::exit(EXIT_SUCCESS);
-}
-
 #ifndef _WIN32
 static bool recv_all(int fd, void* dst, size_t n)
 {
@@ -161,11 +153,10 @@ static bool parseargs(int argc, char* argv[], const fs::path& configFile)
     int opt = 0;
     int option_index = 0;
     opterr = 1; // re-enable since before we disabled for "invalid option" error
-    const char *optstring = "-Vhltgd:C:f:";
+    const char *optstring = "-Vhtgd:C:f:";
     static const struct option opts[] = {
         {"version", no_argument,       0, 'V'},
         {"help",    no_argument,       0, 'h'},
-        {"list",    no_argument,       0, 'l'},
         {"tray",    no_argument,       0, 't'},
         {"gui",     no_argument,       0, 'g'},
         {"delay",   required_argument, 0, 'd'},
@@ -194,8 +185,6 @@ static bool parseargs(int argc, char* argv[], const fs::path& configFile)
                 version(); break;
             case 'h':
                 help(); break;
-            case 'l':
-                print_languages(); break;
             case 'f':
                 g_config->Runtime.source_file = optarg; break;
             case 'd':

@@ -14,8 +14,6 @@
 #include "config.hpp"
 #include "dotenv.h"
 #include "fmt/format.h"
-#include "frozen/string.h"
-#include "langs.hpp"
 #include "screen_capture.hpp"
 #include "screenshot_tool.hpp"
 #include "tinyfiledialogs.h"
@@ -515,31 +513,6 @@ fs::path get_font_path(const std::string& font)
 
             if (e.path().filename() == font_path)
                 return e.path();
-        }
-    }
-
-    return {};
-}
-
-fs::path get_lang_font_path(const std::string& lang)
-{
-    if (g_config->File.lang_fonts_paths.find(lang) != g_config->File.lang_fonts_paths.end())
-    {
-        const fs::path font_path_config(g_config->File.lang_fonts_paths[lang]);
-        if (font_path_config.is_absolute())
-            return font_path_config;
-
-        return get_font_path(font_path_config.string());
-    }
-
-    const auto& it = lang_fonts.find(frozen::string(lang));
-    if (it != lang_fonts.end())
-    {
-        for (const frozen::string font : it->second)
-        {
-            const auto& path = get_font_path(font.data());
-            if (!path.empty())
-                return path;
         }
     }
 

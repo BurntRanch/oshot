@@ -24,12 +24,10 @@
 #include "imgui/imgui_impl_opengl3_loader.h"
 #include "imgui/imgui_internal.h"
 #include "imgui/imgui_stdlib.h"
-#include "langs.hpp"
 #include "screen_capture.hpp"
 #include "socket.hpp"
 #include "tinyfiledialogs.h"
 #include "tool_icons.h"
-#include "translation.hpp"
 #include "util.hpp"
 
 #ifndef GL_NO_ERROR
@@ -38,8 +36,7 @@
 
 using namespace std::chrono_literals;
 
-static constexpr ImVec2            origin(0, 0);
-static std::unique_ptr<Translator> translator;
+static constexpr ImVec2 origin(0, 0);
 
 static std::vector<std::string> get_training_data_list(const std::string& path)
 {
@@ -198,8 +195,7 @@ static ImVec4 get_confidence_color(const int confidence)
 
 Result<> ScreenshotTool::Start()
 {
-    translator = std::make_unique<Translator>();
-    g_sender   = std::make_unique<SocketSender>();
+    g_sender = std::make_unique<SocketSender>();
     Result<capture_result_t> result{ Err() };
 
     if (!g_config->Runtime.source_file.empty())
@@ -332,7 +328,6 @@ void ScreenshotTool::RenderOverlay()
         ImGui::Begin("Text tools", &m_show_text_tools, ImGuiWindowFlags_MenuBar);
         DrawMenuItems();
         DrawOcrTools();
-        DrawTranslationTools();
         DrawBarDecodeTools();
         ImGui::End();
     }
@@ -1010,7 +1005,7 @@ void ScreenshotTool::DrawMenuItems()
         ImGui::Separator();
         ImGui::Spacing();
 
-        ImGui::TextWrapped("Screenshot tool to extract and translate text on the fly");
+        ImGui::TextWrapped("Screenshot tool to extract text on the fly");
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -1135,8 +1130,8 @@ void ScreenshotTool::DrawOcrTools()
             const Result<ocr_result_t>& result = m_ocr_api.ExtractTextCapture(GetFinalImage());
             if (result.ok())
             {
-                m_inputs.ocr_text = m_inputs.to_translate_text = result.get().data;
-                m_inputs.ocr_confidence                        = result.get().confidence;
+                m_inputs.ocr_text       = result.get().data;
+                m_inputs.ocr_confidence = result.get().confidence;
             }
         }
     }
@@ -1172,162 +1167,6 @@ void ScreenshotTool::DrawOcrTools()
         const Result<>& res = g_clipboard->CopyText(m_inputs.ocr_text);
         if (!res.ok())
             error("Failed to copy text: " + res.error_v());
-    }
-
-    ImGui::PopID();
-}
-
-void ScreenshotTool::DrawTranslationTools()
-{
-    std::string& lang_from       = m_inputs.tl_lang_from;
-    std::string& lang_to         = m_inputs.tl_lang_to;
-    size_t&      index_from      = m_inputs.tl_index_from;
-    size_t&      index_to        = m_inputs.tl_index_to;
-    bool&        first_frame     = m_inputs.tl_first_frame;
-    std::string& translated_text = m_inputs.tl_translated_text;
-    ImFont*&     font_from       = m_inputs.tl_font_from;
-    ImFont*&     font_to         = m_inputs.tl_font_to;
-
-    if (first_frame)
-    {
-        if (getNameFromCode(lang_from) == "Unknown")
-            SetError(InvalidLangFrom);
-        else
-            ClearError(InvalidLangFrom);
-
-        if (getNameFromCode(lang_to) == "Unknown")
-            SetError(InvalidLangTo);
-        else
-            ClearError(InvalidLangTo);
-
-        font_from   = GetFontForLanguage(lang_from);
-        font_to     = GetFontForLanguage(lang_to);
-        first_frame = false;
-    }
-
-    ImGui::PushID("TranslationTools");
-    ImGui::SeparatorText("Translation");
-
-    auto createCombo =
-        [&](const char* name, const ErrorFlag err, int start, std::string& lang, size_t& idx, ImFont* font) {
-            ImGui::PushID(name);
-
-            bool style_pushed = false;
-            if (HasError(err))
-            {
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-                style_pushed = true;
-            }
-
-            if (ImGui::BeginCombo(name, getNameFromCode(lang).data(), ImGuiComboFlags_HeightLarge))
-            {
-                static ImGuiTextFilter filter;
-                if (ImGui::IsWindowAppearing())
-                {
-                    ImGui::SetKeyboardFocusHere();
-                    filter.Clear();
-                }
-                ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
-                filter.Draw("##Filter", -FLT_MIN);
-
-                for (size_t i = start; i < GOOGLE_TRANSLATE_LANGUAGES_ARRAY.size(); ++i)
-                {
-                    const std::pair<const char*, const char*>& pair        = GOOGLE_TRANSLATE_LANGUAGES_ARRAY[i];
-                    bool                                       is_selected = idx == i;
-                    if (filter.PassFilter(pair.second))
-                    {
-                        if (ImGui::Selectable(pair.second, is_selected))
-                        {
-                            idx  = i;
-                            lang = GOOGLE_TRANSLATE_LANGUAGES_ARRAY[idx].first;
-                            font = GetFontForLanguage(lang);
-                            (void)font;
-                            ClearError(err);
-                        }
-                    }
-                }
-                ImGui::EndCombo();
-            }
-
-            if (style_pushed)
-            {
-                ImGui::PopStyleColor();
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(1, 0, 0, 1), "Invalid Default Language!");
-            }
-
-            ImGui::PopID();
-        };
-
-    createCombo("From", InvalidLangFrom, 0, lang_from, index_from, font_from);
-
-    ImGui::Spacing();
-
-    // Ignore "Automatic" in To
-    createCombo("To", InvalidLangTo, 1, lang_to, index_to, font_to);
-
-    if (!(HasError(InvalidLangFrom) || HasError(InvalidLangTo)) && !m_inputs.to_translate_text.empty() &&
-        ImGui::Button("Translate"))
-    {
-        const Result<std::string>& translation = translator->Translate(lang_from, lang_to, m_inputs.to_translate_text);
-        if (!translation.ok())
-        {
-            SetError(FailedTranslation, translation.error_v());
-        }
-        else
-        {
-            translated_text = translation.get();
-            ClearError(FailedTranslation);
-        }
-    }
-
-    ImGui::SameLine();
-    HelpMarker(
-        "The translation is done by online services such as Google translate. It sucks at auto-detect and multi-line");
-
-    static constexpr float spacing = 4.0f;   // Spacing between inputs
-    static constexpr float padding = 10.0f;  // Padding on right side
-
-    float available_width = ImGui::GetContentRegionAvail().x - spacing - padding;
-    float width           = available_width / 2.0f;
-
-    if (font_from)
-    {
-        ImGui::PushFont(font_from);
-        ImGui::InputTextMultiline(
-            "##from", &m_inputs.to_translate_text, ImVec2(width, ImGui::GetTextLineHeight() * 10));
-        ImGui::PopFont();
-    }
-    else
-    {
-        ImGui::InputTextMultiline(
-            "##from", &m_inputs.to_translate_text, ImVec2(width, ImGui::GetTextLineHeight() * 10));
-    }
-
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + spacing);
-
-    if (HasError(FailedTranslation))
-    {
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-        translated_text = "Failed to translate text: " + m_err_texts[FailedTranslation];
-        ImGui::InputTextMultiline(
-            "##to", &translated_text, ImVec2(width, ImGui::GetTextLineHeight() * 10), ImGuiInputTextFlags_ReadOnly);
-
-        ImGui::PopStyleColor();
-    }
-
-    else if (font_to)
-    {
-        ImGui::PushFont(font_to);
-        ImGui::InputTextMultiline(
-            "##to", &translated_text, ImVec2(width, ImGui::GetTextLineHeight() * 10), ImGuiInputTextFlags_ReadOnly);
-        ImGui::PopFont();
-    }
-    else
-    {
-        ImGui::InputTextMultiline(
-            "##to", &translated_text, ImVec2(width, ImGui::GetTextLineHeight() * 10), ImGuiInputTextFlags_ReadOnly);
     }
 
     ImGui::PopID();
@@ -1675,15 +1514,11 @@ bool ScreenshotTool::OpenImage(const std::string& path)
     m_image_end            = {};
 
     m_inputs.ocr_text.clear();
-    m_inputs.to_translate_text.clear();
     m_inputs.barcode_text.clear();
 
     ClearError(FailedToInitOcr);
     ClearError(InvalidPath);
     ClearError(InvalidModel);
-    ClearError(FailedTranslation);
-    ClearError(InvalidLangFrom);
-    ClearError(InvalidLangTo);
     ClearError(FailedToExtractBarCode);
 
     return true;
@@ -2059,15 +1894,6 @@ ImFont* ScreenshotTool::CacheAndGetFont(const std::string& font_path, const floa
         m_io.Fonts->Build();
 
     return font;
-}
-
-ImFont* ScreenshotTool::GetFontForLanguage(const std::string& lang_code)
-{
-    const fs::path& font_path = get_lang_font_path(lang_code);
-    if (font_path.empty())
-        return ImGui::GetDefaultFont();
-
-    return CacheAndGetFont(font_path.string(), ImGui::GetFontSize());
 }
 
 Result<void*> ScreenshotTool::CreateTexture(void* tex, std::span<const uint8_t> data, int w, int h)

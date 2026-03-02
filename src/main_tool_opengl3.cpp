@@ -45,6 +45,7 @@ int run_main_tool(const std::string& imgui_ini_path)
         if (!result.ok())
         {
             error("Screenshot failed: {}", result.error());
+            glfwSwapInterval(0);  // Disable vsync
             glfwSetWindowShouldClose(window, GLFW_TRUE);
             return;
         }
@@ -53,6 +54,7 @@ int run_main_tool(const std::string& imgui_ini_path)
         if (!res.ok())
             error("Failed to save as PNG: {}", res.error());
 
+        glfwSwapInterval(0);  // Disable vsync
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     });
 

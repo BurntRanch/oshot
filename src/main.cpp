@@ -68,7 +68,7 @@ using namespace Tray;
 std::deque<std::string>    g_dropped_paths;
 std::unique_ptr<Config>    g_config;
 std::unique_ptr<Clipboard> g_clipboard;
-bool                       g_is_clipboard_server = false;
+bool                       g_is_systray = false;
 int                        g_scr_w{}, g_scr_h{};
 FILE*                      g_fp_log;
 
@@ -375,9 +375,9 @@ int main(int argc, char* argv[])
 #endif
     }
 
-    g_is_clipboard_server = true;
-
 #if !OSHOT_TOOL_ON_MAIN_THREAD
+    g_is_systray = true;
+
     // On macOS the tray loop polls do_capture on the main thread (required by
     // AppKit), so capture_worker must not run, because it would call run_main_tool
     // from a background thread and crash with NSInternalInconsistencyException.

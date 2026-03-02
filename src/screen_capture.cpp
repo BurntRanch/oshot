@@ -182,12 +182,12 @@ static Result<std::string> uri_to_path(const char* uri)
 }
 
 static void on_response(GDBusConnection* conn,
-                        const gchar*     sender_name,
-                        const gchar*     object_path,
-                        const gchar*     interface_name,
-                        const gchar*     signal_name,
-                        GVariant*        parameters,
-                        gpointer         user_data)
+                        const gchar*,  // sender_name,
+                        const gchar*,  // object_path,
+                        const gchar*,  // interface_name,
+                        const gchar*,  // signal_name,
+                        GVariant* parameters,
+                        gpointer  user_data)
 {
     portal_state_t* st = reinterpret_cast<portal_state_t*>(user_data);
 

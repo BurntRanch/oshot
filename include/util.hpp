@@ -138,8 +138,10 @@ constexpr size_t idx(E e) noexcept
     return static_cast<size_t>(e);
 }
 
+// Forward declaration
 struct capture_result_t;
 
+extern bool  g_is_systray;  // old g_is_clipboard_server;
 extern int   g_lock_sock;
 extern int   g_scr_w, g_scr_h;
 extern FILE* g_fp_log;

@@ -234,14 +234,12 @@ Result<> ScreenshotTool::StartWindow()
     m_inputs.ann_font = g_config->File.font;
     m_show_text_tools = g_config->File.show_text_tools;
 
-#ifdef __linux__
-    if (!g_is_clipboard_server)
+    if (!g_is_systray)
         std::thread([] {
             const Result<>& res = g_sender->Start(6015);
             if (!res.ok())
                 error("Error while connecting to systray: {}", res.error());
         }).detach();
-#endif
 
     fit_to_screen(m_screenshot);
 
@@ -1526,6 +1524,8 @@ bool ScreenshotTool::OpenImage(const std::string& path)
 
     m_inputs.ocr_text.clear();
     m_inputs.barcode_text.clear();
+    m_inputs.ocr_confidence   = {};
+    m_inputs.zbar_scan_result = {};
 
     ClearError(FailedToInitOcr);
     ClearError(InvalidPath);

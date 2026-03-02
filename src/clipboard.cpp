@@ -20,7 +20,7 @@ Result<> Clipboard::CopyText(const std::string& text)
     // and fuck your stupid standards that nobody wants to follow
     if (m_session != SessionType::Wayland)
     {
-        if (!g_is_clipboard_server)
+        if (!g_is_systray)
         {
             const Result<>& res = g_sender->Send(text);
             if (res.ok())
@@ -72,7 +72,7 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
         return Err("Failed to copy image into clipboard");
     }
 
-    if (!g_is_clipboard_server)
+    if (!g_is_systray)
     {
         const uint32_t w_be = htonl(static_cast<uint32_t>(cap.w));
         const uint32_t h_be = htonl(static_cast<uint32_t>(cap.h));
@@ -97,9 +97,9 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
     spec.bits_per_pixel = 32;
     spec.bytes_per_row  = cap.w * 4;
 
-    spec.red_mask    = 0xff;
-    spec.green_mask  = 0xff00;
-    spec.blue_mask   = 0xff0000;
+    spec.red_mask    = 0x000000ff;
+    spec.green_mask  = 0x0000ff00;
+    spec.blue_mask   = 0x00ff0000;
     spec.alpha_mask  = 0xff000000;
     spec.red_shift   = 0;
     spec.green_shift = 8;

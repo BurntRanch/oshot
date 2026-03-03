@@ -59,7 +59,7 @@ ocr-path = "~/Downloads/oshot/models"
 Run `sudo pacman -S tesseract-tessdata-<lang>` to install a language model.
 The model files will be located in `/usr/share/tessdata`. Update the model path accordingly.
 
-### Self-installation (not recommended)
+### Self-installation (for Windows, macOS, or as a last resort for Linux)
 1. Download the required language model(s) from the official Tesseract repository:  
    https://github.com/tesseract-ocr/tessdata
 

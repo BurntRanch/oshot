@@ -1,10 +1,14 @@
 #include "clipboard.hpp"
 
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <csignal>
 #include <cstdint>
+#include <cstring>
 
 #include "clip/clip.h"
 #include "socket.hpp"
-#include "tiny-process-library/process.hpp"
 
 #define SVPNG_LINKAGE inline
 #define SVPNG_OUTPUT  std::vector<uint8_t>* output
@@ -13,6 +17,51 @@
 #pragma GCC diagnostic ignored "-Wfree-nonheap-object"
 #include "svpng.h"
 #pragma GCC diagnostic pop
+
+// used to track the wl-copy process
+static int wlcopy_pid = -1;
+
+// Starts wlcopy in the background, forgetting it.
+// Sets wlcopy_pid, and returns an stdin pipe on success.
+Result<int> Start_wlcopy(const std::string& mime_type = "text/plain")
+{
+    // stop if already launched
+    if (wlcopy_pid > 0)
+    {
+        kill(wlcopy_pid, SIGINT);
+
+        // we need to do this, because the process will be defunct otherwise.
+        waitpid(wlcopy_pid, NULL, 0);
+
+        wlcopy_pid = -1;
+    }
+
+    int copy_pipe[2];
+    if (pipe(copy_pipe) == -1)
+    {
+        return Err("Failed to open stdin pipe: " + std::string(strerror(errno)));
+    }
+
+    wlcopy_pid = fork();
+
+    if (wlcopy_pid == 0)
+    {
+        close(copy_pipe[1]);
+        dup2(copy_pipe[0], STDIN_FILENO);
+        close(copy_pipe[0]);
+        execlp("wl-copy", "wl-copy", "--foreground", "--type", mime_type.c_str(), NULL);
+
+        return Err("execlp failed: " + std::string(strerror(errno)));
+    }
+    else if (wlcopy_pid < 0)
+    {
+        return Err("Failed to fork: " + std::string(strerror(errno)));
+    }
+
+    close(copy_pipe[0]);
+
+    return Ok(copy_pipe[1]);
+}
 
 Result<> Clipboard::CopyText(const std::string& text)
 {
@@ -33,15 +82,22 @@ Result<> Clipboard::CopyText(const std::string& text)
         return Err("Failed to copy text into clipboard");
     }
 
-    std::string err;
+    Result<int> res = Start_wlcopy();
+    if (!res.ok())
+    {
+        return res.error();
+    }
 
-    // Use foreground mode so the process doesn't fork away from our pipes.
-    TinyProcessLib::Process proc(
-        { "wl-copy", "--foreground", text }, "", nullptr, [&](const char* b, size_t n) { err.append(b, n); });
+    int fd = res.get();
 
-    if (proc.get_exit_status() == 0)
-        return Ok();
-    return Err("Failed to copy text into clipboard: " + err);
+    if (write(fd, text.c_str(), text.size()) == -1)
+    {
+        return Err("Failed to copy text: " + std::string(strerror(errno)));
+    }
+
+    close(fd);
+
+    return Ok();
 }
 
 Result<> Clipboard::CopyImage(const capture_result_t& cap)
@@ -57,19 +113,21 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
 
         svpng(&png, cap.w, cap.h, cap.view().data(), 1);
 
-        // Use foreground mode so the process doesn't fork away from our pipes.
-        TinyProcessLib::Process proc(
-            { "wl-copy", "--foreground", "--type", "image/png" }, "", nullptr, [&](const char* b, size_t n) {
-                err.append(b, n);
-            });
+        Result<int> res = Start_wlcopy("image/png");
 
-        if (!proc.write(reinterpret_cast<const char*>(png.data()), png.size()))
-            return Err("Failed to write image to stdin");
+        if (!res.ok())
+        {
+            return res.error();
+        }
 
-        proc.close_stdin();
-        if (proc.get_exit_status() == 0)
-            return Ok();
-        return Err("Failed to copy image into clipboard");
+        int fd = res.get();
+
+        if (write(fd, reinterpret_cast<const char*>(png.data()), png.size()) == -1)
+            return Err("Failed to write image to stdin: " + std::string(strerror(errno)));
+
+        close(fd);
+
+        return Ok();
     }
 
     if (!g_is_systray)

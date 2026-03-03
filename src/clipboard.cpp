@@ -5,6 +5,7 @@
 
 #include <csignal>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 #include "clip/clip.h"
@@ -51,7 +52,7 @@ Result<int> Start_wlcopy(const std::string& mime_type = "text/plain")
         close(copy_pipe[0]);
         execlp("wl-copy", "wl-copy", "--foreground", "--type", mime_type.c_str(), NULL);
 
-        return Err("execlp failed: " + std::string(strerror(errno)));
+        exit(-1);
     }
     else if (wlcopy_pid < 0)
     {

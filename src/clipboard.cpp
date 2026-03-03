@@ -6,6 +6,7 @@
 
 #include "clip/clip.h"
 #include "socket.hpp"
+#include "tiny-process-library/process.hpp"
 
 #define SVPNG_LINKAGE inline
 #define SVPNG_OUTPUT  std::vector<uint8_t>* output
@@ -98,6 +99,7 @@ Result<> Clipboard::CopyText(const std::string& text)
 
     if (write(fd, text.c_str(), text.size()) == -1)
     {
+        close(fd);
         return Err("Failed to copy text: " + std::string(strerror(errno)));
     }
 
@@ -129,7 +131,10 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
         int fd = res.get();
 
         if (write(fd, reinterpret_cast<const char*>(png.data()), png.size()) == -1)
+        {
+            close(fd);
             return Err("Failed to write image to stdin: " + std::string(strerror(errno)));
+        }
 
         close(fd);
 

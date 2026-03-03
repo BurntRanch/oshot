@@ -24,7 +24,7 @@ static int wlcopy_pid = -1;
 
 // Starts wlcopy in the background, forgetting it.
 // Sets wlcopy_pid, and returns an stdin pipe on success.
-Result<int> Start_wlcopy(const std::string& mime_type = "text/plain")
+Result<int> Start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-8")
 {
     // stop if already launched
     if (wlcopy_pid > 0)

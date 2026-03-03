@@ -65,7 +65,7 @@
 #endif
 // clang-format on
 
-char g_sock_path[108];
+char g_sock_path[100];
 int  g_sock = -1;
 
 #if __linux__

@@ -142,7 +142,8 @@ constexpr size_t idx(E e) noexcept
 struct capture_result_t;
 
 extern bool  g_is_systray;  // old g_is_clipboard_server;
-extern int   g_lock_sock;
+extern int   g_sock;
+extern char  g_sock_path[108];
 extern int   g_scr_w, g_scr_h;
 extern FILE* g_fp_log;
 

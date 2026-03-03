@@ -1,5 +1,7 @@
 #include "util.hpp"
 
+#include <sys/un.h>
+
 #include <chrono>
 #include <csignal>
 #include <cstdint>
@@ -63,7 +65,8 @@
 #endif
 // clang-format on
 
-int g_lock_sock = -1;
+char g_sock_path[108];
+int  g_sock = -1;
 
 #if __linux__
 std::vector<uint8_t> ximage_to_rgba(XImage* image, int width, int height)
@@ -152,44 +155,27 @@ int get_screen_dpi()
 #else
 bool acquire_tray_lock()
 {
-    const fs::path& lock_path = fs::temp_directory_path() / "oshot.lock";
+    const fs::path& runtime_dir = ::getenv("XDG_RUNTIME_DIR") ? ::getenv("XDG_RUNTIME_DIR") : fs::temp_directory_path();
 
-    // Check if stale: read PID and verify process is alive
-    if (fs::exists(lock_path))
-    {
-        std::ifstream f(lock_path);
-        pid_t         pid = 0;
-        f >> pid;
-        // Here kill() doesn't actually *kill* anything
-        // just tests if pid exists or not
-        if (pid > 0 && kill(pid, 0) == 0)
-            return false;
-        // stale lock - fall through and overwrite
-        fs::remove(lock_path);
-    }
-
-    std::ofstream f(lock_path, std::ios::trunc);
-    if (!f.is_open())
-        return false;
-    f << getpid();
-
-    g_lock_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (g_lock_sock < 0)
+    g_sock = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (g_sock < 0)
         return false;
 
-    sockaddr_in addr{};
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(6015);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // 127.0.0.1
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
 
-    if (bind(g_lock_sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
+    // Write 108 bytes at most to `addr.sun_path`, with the path to `oshot.sock`.
+    ::strncpy(addr.sun_path, (runtime_dir / "oshot.sock").c_str(), 107);
+    ::strncpy(g_sock_path, addr.sun_path, 107);
+
+    if (::bind(g_sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
     {
-        close(g_lock_sock);
-        g_lock_sock = -1;
+        ::close(g_sock);
+        g_sock = -1;
         return false;
     }
 
-    listen(g_lock_sock, 1);
+    ::listen(g_sock, 1);
     return true;
 }
 

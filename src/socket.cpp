@@ -1,5 +1,8 @@
 #include "socket.hpp"
 
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -9,20 +12,20 @@
 
 std::unique_ptr<SocketSender> g_sender;
 
-Result<> SocketSender::Start(int port)
+Result<> SocketSender::Start()
 {
 #ifdef __linux__
-    m_sock = socket(AF_INET, SOCK_STREAM, 0);
+    const fs::path& runtime_dir = ::getenv("XDG_RUNTIME_DIR") ? ::getenv("XDG_RUNTIME_DIR") : fs::temp_directory_path();
+    m_sock                      = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (m_sock < 0)
         return Err("Failed to open socket stream: " + std::string(strerror(errno)));
 
-    sockaddr_in serv_addr{};
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port   = htons(port);
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
-        return Err("Invalid address for socket (127.0.0.1)");
+    sockaddr_un serv_addr{};
+    serv_addr.sun_family = AF_UNIX;
 
-    if (connect(m_sock, reinterpret_cast<struct sockaddr*>(&serv_addr), sizeof(serv_addr)))
+    ::strncpy(serv_addr.sun_path, (runtime_dir / "oshot.sock").c_str(), 107);
+
+    if (::connect(m_sock, reinterpret_cast<struct sockaddr*>(&serv_addr), sizeof(serv_addr)))
         return Err("Failed to connect to launcher: " + std::string(strerror(errno)));
 #endif
     return Ok();

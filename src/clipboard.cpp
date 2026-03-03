@@ -54,12 +54,14 @@ Result<int> Start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-
 
         exit(-1);
     }
-    else if (wlcopy_pid < 0)
-    {
-        return Err("Failed to fork: " + std::string(strerror(errno)));
-    }
 
     close(copy_pipe[0]);
+
+    if (wlcopy_pid < 0)
+    {
+        close(copy_pipe[1]);
+        return Err("Failed to fork: " + std::string(strerror(errno)));
+    }
 
     return Ok(copy_pipe[1]);
 }

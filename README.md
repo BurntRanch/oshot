@@ -48,7 +48,9 @@ You can do this by configuring the language data path in `config.toml`:
    - Linux: `~/.config/oshot/config.toml`
 
 Set the `ocr-path` variable to the directory containing the `.traineddata` files.
+
 The directory will differ based on how you download the additional models, read below for more info.
+
 Example:
 ```toml
 # Works on windows too
@@ -57,6 +59,7 @@ ocr-path = "~/Downloads/oshot/models"
 
 ### Arch Linux
 Run `sudo pacman -S tesseract-tessdata-<lang>` to install a language model.
+
 The model files will be located in `/usr/share/tessdata`. Update the model path accordingly.
 
 ### Self-installation (for Windows, macOS, or as a last resort for Linux)

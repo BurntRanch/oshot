@@ -37,27 +37,37 @@ $ ninja
 $ ./oshot
 ```
 
-## Downloading additional language models
+## Optical Character Recognition (Tesseract)
 Tesseract uses separate language model files (`.traineddata`) for each language.  
-You can store these files anywhere you like, as long as the path is configured correctly.
+Configuration will depend on how you choose to download the additional models.
 
+### Setting the model path
+To use tesseract, oshot needs to know where your model files are.
+You can do this by configuring the language data path in `config.toml`:
+   - Windows: `%APPDATA%/oshot/config.toml`
+   - Linux: `~/.config/oshot/config.toml`
+
+Set the `ocr-path` variable to the directory containing the `.traineddata` files.
+The directory will differ based on how you download the additional models, read below for more info.
+Example:
+```toml
+# Works on windows too
+ocr-path = "~/Downloads/oshot/models"
+```
+
+### Arch Linux
+Run `sudo pacman -S tesseract-tessdata-<lang>` to install a language model.
+The model files will be located in `/usr/share/tessdata`. Update the model path accordingly.
+
+### Self-installation (not recommended)
 1. Download the required language model(s) from the official Tesseract repository:  
    https://github.com/tesseract-ocr/tessdata
 
 2. Place the downloaded `.traineddata` files in one of the following locations:
    - The `models/` directory next to the `oshot` binary (recommended)
-   - Or any other directory of your choice (configure the path in the config file)
+   - Or any other directory of your choice
 
-3. Configure the language data path in `config.toml`:
-   - Windows: `%APPDATA%/oshot/config.toml`
-   - Linux: `~/.config/oshot/config.toml`
-
-   Set the `ocr-path` variable to the directory containing the `.traineddata` files.
-   Example:
-   ```toml
-   # Works on windows too
-   ocr-path = "~/Downloads/oshot/models"
-   ```
+3. Wherever you put the files, set the model path in the config file.
 
 ## Troubleshooting
 ### Windows

@@ -56,6 +56,7 @@
 #  include <arpa/inet.h>
 #  include <netdb.h>
 #  include <pwd.h>
+#  include <fcntl.h>
 #  include <sys/select.h>
 #  include <sys/socket.h>
 #  include <unistd.h>
@@ -170,7 +171,7 @@ bool acquire_tray_lock()
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
 
-    // Write 108 bytes at most to `addr.sun_path`, with the path to `oshot.sock`.
+    // Write 99 bytes at most to `addr.sun_path`, with the path to `oshot.sock`.
     strncpy(addr.sun_path, (get_runtime_dir() / "oshot.sock").c_str(), 99);
     // ensure null-termination
     addr.sun_path[99] = '\0';
@@ -185,6 +186,7 @@ bool acquire_tray_lock()
         return false;
     }
 
+    fcntl(g_sock, F_SETFD, FD_CLOEXEC);
     listen(g_sock, 1);
     return true;
 }

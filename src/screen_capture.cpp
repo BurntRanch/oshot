@@ -37,6 +37,18 @@
 #  pragma comment(lib, "dxgi")
 #endif
 
+static const char* create_temp_png()
+{
+    char tmppath[] = "/tmp/oshot_XXXXXX.png";
+    int  fd        = mkstemps(tmppath, 4);
+    if (fd < 0)
+        return nullptr;
+    close(fd);
+    return strdup(tmppath);
+}
+
+
+
 SessionType get_session_type()
 {
 #ifdef _WIN32
@@ -130,16 +142,6 @@ static bool is_kde_session()
     if (kde && kde[0] != '\0')
         return true;
     return false;
-}
-
-static const char* create_temp_png()
-{
-    char tmppath[] = "/tmp/oshot_XXXXXX.png";
-    int  fd        = mkstemps(tmppath, 4);
-    if (fd < 0)
-        return nullptr;
-    close(fd);
-    return strdup(tmppath);
 }
 
 Result<capture_result_t> capture_full_screen_x11()

@@ -1,13 +1,11 @@
 #include "util.hpp"
 
 #include <chrono>
-#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <vector>
 
 #include "clipboard.hpp"
@@ -16,6 +14,7 @@
 #include "fmt/format.h"
 #include "screen_capture.hpp"
 #include "screenshot_tool.hpp"
+#include "socket.hpp"
 #include "tinyfiledialogs.h"
 
 #define SVPNG_LINKAGE inline
@@ -157,8 +156,13 @@ fs::path get_runtime_dir()
     const char* xdg = ::getenv("XDG_RUNTIME_DIR");
     return xdg ? fs::path(xdg) : fs::temp_directory_path();
 }
+
 bool acquire_tray_lock()
 {
+    // we are the "client" (not systray)
+    if (g_sender->Start().ok())
+        return false;
+
     g_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (g_sock < 0)
         return false;
@@ -173,6 +177,7 @@ bool acquire_tray_lock()
 
     strncpy(g_sock_path, addr.sun_path, 100);
 
+    unlink(addr.sun_path);  // remove stale socket
     if (bind(g_sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
     {
         close(g_sock);

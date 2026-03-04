@@ -13,6 +13,7 @@
 #if defined(__linux__)
 #  include <X11/Xlib.h>
 #  include <X11/Xutil.h>
+#  include <X11/extensions/Xrandr.h>
 #  include <gio/gio.h>
 #  include <unistd.h>
 
@@ -73,11 +74,68 @@ Result<capture_result_t> capture_full_screen_x11()
         return capture_full_screen_portal();
     }
 
-    Window            root = DefaultRootWindow(display);
-    XWindowAttributes attrs;
-    XGetWindowAttributes(display, root, &attrs);
+    Window root = DefaultRootWindow(display);
 
-    XImage* image = XGetImage(display, root, 0, 0, attrs.width, attrs.height, AllPlanes, ZPixmap);
+    // Query the cursor position so we know which monitor the user is on
+    Window       root_ret, child_ret;
+    int          root_x = 0, root_y = 0, win_x = 0, win_y = 0;
+    unsigned int mask = 0;
+    XQueryPointer(display, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &mask);
+
+    // Use XRandR 1.5 to enumerate physical monitors and pick the one under the cursor.
+    // This prevents capturing the entire virtual desktop on multi-monitor setups.
+    int capture_x = 0, capture_y = 0;
+    int capture_w = 0, capture_h = 0;
+
+    int             monitor_count = 0;
+    XRRMonitorInfo* monitors      = XRRGetMonitors(display, root, True, &monitor_count);
+
+    if (monitors && monitor_count > 0)
+    {
+        // Default to first monitor in case the cursor query gave unexpected coords
+        capture_x = monitors[0].x;
+        capture_y = monitors[0].y;
+        capture_w = monitors[0].width;
+        capture_h = monitors[0].height;
+
+        for (int i = 0; i < monitor_count; ++i)
+        {
+            const int mx = monitors[i].x;
+            const int my = monitors[i].y;
+            const int mw = monitors[i].width;
+            const int mh = monitors[i].height;
+
+            if (root_x >= mx && root_x < mx + mw &&
+                root_y >= my && root_y < my + mh)
+            {
+                capture_x = mx;
+                capture_y = my;
+                capture_w = mw;
+                capture_h = mh;
+                debug("X11 capture: monitor {}x{}+{}+{} (cursor at {},{}) ", mw, mh, mx, my, root_x, root_y);
+                break;
+            }
+        }
+        XRRFreeMonitors(monitors);
+    }
+    else
+    {
+        // Fall back to root window dimensions (old single-monitor behavior)
+        warn("XRandR returned no monitors, falling back to root window size");
+        XWindowAttributes attrs;
+        XGetWindowAttributes(display, root, &attrs);
+        capture_w = attrs.width;
+        capture_h = attrs.height;
+    }
+
+    XImage* image = XGetImage(display,
+                              root,
+                              capture_x,
+                              capture_y,
+                              static_cast<unsigned int>(capture_w),
+                              static_cast<unsigned int>(capture_h),
+                              AllPlanes,
+                              ZPixmap);
     if (!image)
     {
         warn("Failed to capture screen image");
@@ -85,9 +143,9 @@ Result<capture_result_t> capture_full_screen_x11()
         return capture_full_screen_portal();
     }
 
-    result.data = ximage_to_rgba(image, attrs.width, attrs.height);
-    result.w    = attrs.width;
-    result.h    = attrs.height;
+    result.data = ximage_to_rgba(image, capture_w, capture_h);
+    result.w    = capture_w;
+    result.h    = capture_h;
 
     XDestroyImage(image);
     XCloseDisplay(display);
@@ -97,6 +155,10 @@ Result<capture_result_t> capture_full_screen_x11()
 
 Result<capture_result_t> capture_full_screen_wayland()
 {
+    const Result<capture_result_t> res = capture_full_screen_portal();
+    if (res.ok())
+        return res;
+
     capture_result_t result;
 
     std::vector<uint8_t>    buf;
@@ -152,12 +214,14 @@ struct portal_state_t
 {
     GMainLoop* loop;
     guint      subscription_id;
+    guint      timeout_id;  // tracked so we can cancel it before the stack frame is gone
 };
 
 static gboolean on_timeout(gpointer user_data)
 {
     portal_state_t* st   = reinterpret_cast<portal_state_t*>(user_data);
     cap_portal.error_msg = "Timed out waiting for portal response (is xdg-desktop-portal running?)";
+    st->timeout_id       = 0;  // GLib will remove the source; mark it gone so cleanup skips it
     g_main_loop_quit(st->loop);
     return G_SOURCE_REMOVE;
 }
@@ -206,7 +270,10 @@ static void on_response(GDBusConnection* conn,
         g_variant_unref(results);
 
     if (st->subscription_id)
+    {
         g_dbus_connection_signal_unsubscribe(conn, st->subscription_id);
+        st->subscription_id = 0;  // mark as removed so cleanup in capture_full_screen_portal skips it
+    }
 
     const Result<std::string>& res = uri_to_path(uri);
     if (res.ok())
@@ -271,7 +338,9 @@ Result<capture_result_t> capture_full_screen_portal()
     }
 
     portal_state_t st;
-    st.loop = g_main_loop_new(nullptr, FALSE);
+    st.loop            = g_main_loop_new(nullptr, FALSE);
+    st.subscription_id = 0;
+    st.timeout_id      = 0;
 
     // Subscribe specifically to the request object's Response signal.
     st.subscription_id = g_dbus_connection_signal_subscribe(bus,
@@ -285,10 +354,23 @@ Result<capture_result_t> capture_full_screen_portal()
                                                             &st,
                                                             nullptr);
 
-    // Don’t hang forever if nothing responds.
-    g_timeout_add_seconds(5, on_timeout, &st);
+    // Don't hang forever if nothing responds.
+    // Save the source ID so we can cancel it if on_response fires first -- otherwise
+    // the timeout fires after this stack frame is gone, passing a dangling portal_state_t*
+    // to on_timeout and crashing on g_main_loop_quit (the SIGSEGV from the tray loop).
+    st.timeout_id = g_timeout_add_seconds(5, on_timeout, &st);
 
     g_main_loop_run(st.loop);
+
+    // Cancel whichever of {timeout, signal subscription} did NOT fire.
+    // on_timeout  zeros st.timeout_id      before returning G_SOURCE_REMOVE.
+    // on_response zeros st.subscription_id after calling signal_unsubscribe.
+    // A non-zero value here means the other path exited the loop and we must
+    // remove this source ourselves before st goes out of scope.
+    if (st.timeout_id)
+        g_source_remove(st.timeout_id);
+    if (st.subscription_id)
+        g_dbus_connection_signal_unsubscribe(bus, st.subscription_id);
 
     g_variant_unref(reply);
     g_main_loop_unref(st.loop);

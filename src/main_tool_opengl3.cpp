@@ -13,8 +13,70 @@
 #  endif
 #  include <GLFW/glfw3.h>  // Will drag system OpenGL headers
 
+#  if defined(_WIN32)
+#    define WIN32_LEAN_AND_MEAN
+#    include <windows.h>
+#  elif defined(__linux__)
+#    include <X11/Xlib.h>
+#  endif
+
 void glfw_error_callback(int i_error, const char* description);
 void glfw_drop_callback(GLFWwindow*, int count, const char** paths);
+
+// Returns the GLFW monitor that currently contains the cursor.
+// Falls back to the primary monitor if the cursor position cannot be
+// determined (e.g. on a pure Wayland session without XWayland).
+static GLFWmonitor* get_monitor_at_cursor()
+{
+    int  cursor_x = 0, cursor_y = 0;
+    bool cursor_ok = false;
+
+#  if defined(_WIN32)
+    POINT pt{};
+    if (GetCursorPos(&pt))
+    {
+        cursor_x  = static_cast<int>(pt.x);
+        cursor_y  = static_cast<int>(pt.y);
+        cursor_ok = true;
+    }
+#  elif defined(__linux__)
+    // X11 or XWayland
+    Display* dpy = XOpenDisplay(nullptr);
+    if (dpy)
+    {
+        Window   root  = DefaultRootWindow(dpy);
+        Window   child = None;
+        int      win_x = 0, win_y = 0;
+        unsigned mask = 0;
+        if (XQueryPointer(dpy, root, &root, &child, &cursor_x, &cursor_y, &win_x, &win_y, &mask))
+            cursor_ok = true;
+        XCloseDisplay(dpy);
+    }
+#  endif
+
+    if (!cursor_ok)
+        return glfwGetPrimaryMonitor();
+
+    int           monitor_count = 0;
+    GLFWmonitor** monitors      = glfwGetMonitors(&monitor_count);
+
+    for (int i = 0; i < monitor_count; ++i)
+    {
+        int mx = 0, my = 0;
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+
+        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
+        if (!mode)
+            continue;
+
+        // Found focused monitor
+        if (cursor_x >= mx && cursor_x < mx + mode->width &&
+            cursor_y >= my && cursor_y < my + mode->height)
+            return monitors[i];
+    }
+
+    return glfwGetPrimaryMonitor();
+}
 
 GLFWwindow* window = nullptr;
 
@@ -108,18 +170,27 @@ int run_main_tool(const std::string& imgui_ini_path)
     glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
 #  endif
 
-    GLFWmonitor*       monitor = glfwGetPrimaryMonitor();
+    GLFWmonitor*       monitor = get_monitor_at_cursor();
     const GLFWvidmode* mode    = glfwGetVideoMode(monitor);
 
+    // Pass nullptr as the monitor to get a borderless windowed overlay
+    // instead of exclusive fullscreen. This ensures GLFW_DECORATED,
+    // GLFW_FLOATING, and GLFW_AUTO_ICONIFY hints actually take effect
+    // (they are silently ignored for exclusive fullscreen windows), and
+    // keeps mouse/keyboard events scoped to this monitor so they don't
+    // bleed in from the other display on multi-monitor setups.
     window = glfwCreateWindow(mode->width, mode->height, "oshot", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
         return EXIT_FAILURE;
     }
+
+    // Position the borderless window exactly over the chosen monitor.
     int mon_x = 0, mon_y = 0;
     glfwGetMonitorPos(monitor, &mon_x, &mon_y);
     glfwSetWindowPos(window, mon_x, mon_y);
+
     glfwMakeContextCurrent(window);
     glfwSetDropCallback(window, glfw_drop_callback);
     glfwSwapInterval(1);  // Enable vsync

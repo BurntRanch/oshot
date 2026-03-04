@@ -6,7 +6,6 @@
 
 #include "clip/clip.h"
 #include "socket.hpp"
-#include "tiny-process-library/process.hpp"
 
 #define SVPNG_LINKAGE inline
 #define SVPNG_OUTPUT  std::vector<uint8_t>* output
@@ -80,7 +79,7 @@ Result<> Clipboard::CopyText(const std::string& text)
     if (m_session != SessionType::Wayland)
     {
 #endif
-        if (!g_is_systray)
+        if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD)
         {
             const Result<>& res = g_sender->Send(text);
             if (res.ok())
@@ -147,7 +146,7 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
     }
 #endif
 
-    if (!g_is_systray)
+    if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD)
     {
         const uint32_t w_be = htonl(static_cast<uint32_t>(cap.w));
         const uint32_t h_be = htonl(static_cast<uint32_t>(cap.h));

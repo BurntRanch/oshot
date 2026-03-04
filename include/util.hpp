@@ -36,6 +36,12 @@ enum class SavingOp;
 #  define _(s) (char*)s
 #endif
 
+#if defined(_WIN32) || defined(__APPLE__)
+#  define OSHOT_TOOL_ON_MAIN_THREAD true
+#else
+#  define OSHOT_TOOL_ON_MAIN_THREAD false
+#endif
+
 // shotout to the better c++ server for these helper structs
 template <typename T = bool>
 struct Ok

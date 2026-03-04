@@ -1,14 +1,8 @@
-#include <csignal>
-#if defined(_WIN32) || defined(__APPLE__)
-#  define OSHOT_TOOL_ON_MAIN_THREAD true
-#else
-#  define OSHOT_TOOL_ON_MAIN_THREAD false
-#endif
-
 #include <atomic>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 #include <cstring>
 #include <deque>
 #include <filesystem>
@@ -19,6 +13,7 @@
 #include <system_error>
 #include <thread>
 #include <utility>
+#include "socket.hpp"
 
 #ifndef _WIN32
 #  include <netdb.h>
@@ -360,27 +355,28 @@ int main(int argc, char* argv[])
     const std::string& imgui_ini_path = configDir + "/imgui.ini";
 
     g_clipboard = std::make_unique<Clipboard>(get_session_type());
+    g_sender    = std::make_unique<SocketSender>();
     g_config    = std::make_unique<Config>(configFile, configDir);
     if (!parseargs(argc, argv, configFile))
         return EXIT_FAILURE;
 
     g_config->LoadConfigFile(configFile);
 
-    const bool tray_already_exists = !acquire_tray_lock();
+    const bool tray_lock_acquired = acquire_tray_lock();
 
     if (g_config->Runtime.only_launch_gui)
         return run_main_tool(imgui_ini_path);
 
     if (g_config->Runtime.only_launch_tray)
     {
-        if (tray_already_exists)
+        if (!tray_lock_acquired)
             return EXIT_FAILURE;
-        // falls through to tray/worker launch below
+
+        g_is_systray = true;
     }
     else
     {
-        // default: launch GUI (detached if tray is starting, foreground if tray already exists)
-        if (tray_already_exists)
+        if (!tray_lock_acquired)
             return run_main_tool(imgui_ini_path);
 
 #if OSHOT_TOOL_ON_MAIN_THREAD
@@ -391,8 +387,6 @@ int main(int argc, char* argv[])
     }
 
 #if !OSHOT_TOOL_ON_MAIN_THREAD
-    g_is_systray = true;
-
     // On macOS the tray loop polls do_capture on the main thread (required by
     // AppKit), so capture_worker must not run, because it would call run_main_tool
     // from a background thread and crash with NSInternalInconsistencyException.

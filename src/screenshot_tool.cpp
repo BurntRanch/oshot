@@ -25,7 +25,6 @@
 #include "imgui/imgui_internal.h"
 #include "imgui/imgui_stdlib.h"
 #include "screen_capture.hpp"
-#include "socket.hpp"
 #include "tinyfiledialogs.h"
 #include "tool_icons.h"
 #include "util.hpp"
@@ -195,7 +194,6 @@ static ImVec4 get_confidence_color(const int confidence)
 
 Result<> ScreenshotTool::Start()
 {
-    g_sender = std::make_unique<SocketSender>();
     Result<capture_result_t> result{ Err() };
 
     if (!g_config->Runtime.source_file.empty())
@@ -233,13 +231,6 @@ Result<> ScreenshotTool::StartWindow()
 
     m_inputs.ann_font = g_config->File.font;
     m_show_text_tools = g_config->File.show_text_tools;
-
-    if (!g_is_systray)
-        std::thread([] {
-            const Result<>& res = g_sender->Start();
-            if (!res.ok())
-                error("Error while connecting to systray: {}", res.error());
-        }).detach();
 
     fit_to_screen(m_screenshot);
 

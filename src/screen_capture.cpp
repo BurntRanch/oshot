@@ -1,5 +1,6 @@
 #include "screen_capture.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -63,6 +64,62 @@ SessionType get_session_type()
 #ifdef __linux__
 Result<capture_result_t> capture_full_screen_portal();
 
+// Query the geometry of the monitor under the cursor via Xlib + XRandR.
+// Works on native X11 and on any Wayland compositor that runs XWayland
+// (KDE, GNOME, etc.) because $DISPLAY is set in those sessions.
+// Returns false if X is unavailable (pure Wayland without XWayland).
+static bool get_cursor_monitor_xrandr(Display* display, int& out_x, int& out_y, int& out_w, int& out_h)
+{
+    const char* disp_env = std::getenv("DISPLAY");
+    if (!disp_env || disp_env[0] == '\0')
+        return false;
+
+    Display* dpy = display ? display : XOpenDisplay(disp_env);
+    if (!dpy)
+        return false;
+
+    // Query the cursor position so we know which monitor the user is on
+    Window       root = DefaultRootWindow(dpy);
+    Window       root_ret, child_ret;
+    int          root_x = 0, root_y = 0, win_x = 0, win_y = 0;
+    unsigned int mask = 0;
+    XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &mask);
+
+    int             nmon     = 0;
+    XRRMonitorInfo* monitors = XRRGetMonitors(dpy, root, True, &nmon);
+
+    bool found = false;
+    if (monitors && nmon > 0)
+    {
+        // Default to first monitor in case the cursor position is ambiguous
+        out_x = monitors[0].x;
+        out_y = monitors[0].y;
+        out_w = monitors[0].width;
+        out_h = monitors[0].height;
+        found = true;
+
+        for (int i = 0; i < nmon; ++i)
+        {
+            const int mx = monitors[i].x, my = monitors[i].y;
+            const int mw = monitors[i].width, mh = monitors[i].height;
+            if (root_x >= mx && root_x < mx + mw && root_y >= my && root_y < my + mh)
+            {
+                out_x = mx;
+                out_y = my;
+                out_w = mw;
+                out_h = mh;
+                debug("X11 capture: monitor {}x{}+{}+{} (cursor at {},{}) ", mw, mh, mx, my, root_x, root_y);
+                break;
+            }
+        }
+        XRRFreeMonitors(monitors);
+    }
+
+    if (!display)
+        XCloseDisplay(dpy);
+    return found;
+}
+
 Result<capture_result_t> capture_full_screen_x11()
 {
     capture_result_t result;
@@ -76,49 +133,10 @@ Result<capture_result_t> capture_full_screen_x11()
 
     Window root = DefaultRootWindow(display);
 
-    // Query the cursor position so we know which monitor the user is on
-    Window       root_ret, child_ret;
-    int          root_x = 0, root_y = 0, win_x = 0, win_y = 0;
-    unsigned int mask = 0;
-    XQueryPointer(display, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &mask);
-
-    // Use XRandR 1.5 to enumerate physical monitors and pick the one under the cursor.
-    // This prevents capturing the entire virtual desktop on multi-monitor setups.
     int capture_x = 0, capture_y = 0;
     int capture_w = 0, capture_h = 0;
 
-    int             monitor_count = 0;
-    XRRMonitorInfo* monitors      = XRRGetMonitors(display, root, True, &monitor_count);
-
-    if (monitors && monitor_count > 0)
-    {
-        // Default to first monitor in case the cursor query gave unexpected coords
-        capture_x = monitors[0].x;
-        capture_y = monitors[0].y;
-        capture_w = monitors[0].width;
-        capture_h = monitors[0].height;
-
-        for (int i = 0; i < monitor_count; ++i)
-        {
-            const int mx = monitors[i].x;
-            const int my = monitors[i].y;
-            const int mw = monitors[i].width;
-            const int mh = monitors[i].height;
-
-            if (root_x >= mx && root_x < mx + mw &&
-                root_y >= my && root_y < my + mh)
-            {
-                capture_x = mx;
-                capture_y = my;
-                capture_w = mw;
-                capture_h = mh;
-                debug("X11 capture: monitor {}x{}+{}+{} (cursor at {},{}) ", mw, mh, mx, my, root_x, root_y);
-                break;
-            }
-        }
-        XRRFreeMonitors(monitors);
-    }
-    else
+    if (!get_cursor_monitor_xrandr(display, capture_x, capture_y, capture_w, capture_h))
     {
         // Fall back to root window dimensions (old single-monitor behavior)
         warn("XRandR returned no monitors, falling back to root window size");
@@ -389,6 +407,7 @@ Result<capture_result_t> capture_full_screen_portal()
     if (!rgba)
     {
         const char* reason = stbi_failure_reason();
+        unlink(cap_portal.png_path.c_str());
         return Err("Failed to read PNG data: " + std::string(reason ? reason : "Unknown"));
     }
 
@@ -396,6 +415,51 @@ Result<capture_result_t> capture_full_screen_portal()
     cap_portal.cap.h = h;
     cap_portal.cap.data.assign(rgba, rgba + (static_cast<size_t>(w) * h * 4));
     stbi_image_free(rgba);
+
+    // The portal backend (e.g. KDE) writes a permanent file to ~/Pictures
+    // (named "Screenshot_*.png" by KDE, not "oshot_*").  Delete it now that
+    // we have the pixels in memory.
+    unlink(cap_portal.png_path.c_str());
+
+    // The portal always captures the full virtual desktop on multi-monitor
+    // setups. Crop down to the monitor that contains the cursor.
+    // XRandR works on native X11 and on KDE/GNOME Wayland via XWayland.
+    {
+        int mx = 0, my = 0, mw = 0, mh = 0;
+        if (get_cursor_monitor_xrandr(nullptr, mx, my, mw, mh) && (cap_portal.cap.w > mw || cap_portal.cap.h > mh))
+        {
+            debug("Portal: cropping {}x{} capture to monitor {}x{}+{}+{}",
+                  cap_portal.cap.w,
+                  cap_portal.cap.h,
+                  mw,
+                  mh,
+                  mx,
+                  my);
+
+            const int x0    = std::max(0, mx);
+            const int y0    = std::max(0, my);
+            const int x1    = std::min(cap_portal.cap.w, mx + mw);
+            const int y1    = std::min(cap_portal.cap.h, my + mh);
+            const int new_w = x1 - x0;
+            const int new_h = y1 - y0;
+
+            if (new_w > 0 && new_h > 0)
+            {
+                const int            src_stride = cap_portal.cap.w;
+                std::vector<uint8_t> cropped(static_cast<size_t>(new_w) * new_h * 4);
+                for (int row = 0; row < new_h; ++row)
+                {
+                    const uint8_t* src =
+                        cap_portal.cap.data.data() + (static_cast<size_t>(y0 + row) * src_stride + x0) * 4;
+                    uint8_t* dst = cropped.data() + static_cast<size_t>(row) * new_w * 4;
+                    std::memcpy(dst, src, static_cast<size_t>(new_w) * 4);
+                }
+                cap_portal.cap.data = std::move(cropped);
+                cap_portal.cap.w    = new_w;
+                cap_portal.cap.h    = new_h;
+            }
+        }
+    }
 
     return Ok(std::move(cap_portal.cap));
 }

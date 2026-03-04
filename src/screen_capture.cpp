@@ -1,6 +1,7 @@
 #include "screen_capture.hpp"
 
 #include <algorithm>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -120,6 +121,27 @@ static bool get_cursor_monitor_xrandr(Display* display, int& out_x, int& out_y, 
     return found;
 }
 
+static bool is_kde_session()
+{
+    const char* xdg = std::getenv("XDG_CURRENT_DESKTOP");
+    if (xdg && strstr(xdg, "KDE") != nullptr)
+        return true;
+    const char* kde = std::getenv("KDE_FULL_SESSION");
+    if (kde && kde[0] != '\0')
+        return true;
+    return false;
+}
+
+static const char* create_temp_png()
+{
+    char tmppath[] = "/tmp/oshot_XXXXXX.png";
+    int  fd        = mkstemps(tmppath, 4);
+    if (fd < 0)
+        return nullptr;
+    close(fd);
+    return strdup(tmppath);
+}
+
 Result<capture_result_t> capture_full_screen_x11()
 {
     capture_result_t result;
@@ -171,8 +193,65 @@ Result<capture_result_t> capture_full_screen_x11()
     return Ok(std::move(result));
 }
 
+// Capture the monitor that contains the pointer using KDE's `spectacle`.
+// `spectacle -m` (--screen) always captures the monitor the cursor is on,
+// which is exactly what we need and what the generic XDG portal does NOT
+// guarantee when it runs non-interactively on a multi-monitor setup.
+Result<capture_result_t> capture_full_screen_spectacle()
+{
+    capture_result_t result;
+
+    const char* tmppath = create_temp_png();
+    if (!tmppath)
+        return Err("capture_full_screen_spectacle: failed to create temp png");
+
+    // -b  run in background (no GUI window)
+    // -n  suppress the "screenshot saved" desktop notification
+    // -m  capture the monitor containing the mouse pointer
+    // -o  write to the given path instead of the default Pictures folder
+    TinyProcessLib::Process proc({ "spectacle", "-b", "-n", "-m", "-o", tmppath }, "");
+
+    const int exit_code = proc.get_exit_status();
+    if (exit_code != 0)
+    {
+        unlink(tmppath);
+        warn("spectacle exited with code {}", exit_code);
+        return Err("spectacle failed");
+    }
+
+    int      w = 0, h = 0, comp = 0;
+    uint8_t* rgba = stbi_load(tmppath, &w, &h, &comp, STBI_rgb_alpha);
+    unlink(tmppath);
+
+    if (!rgba)
+    {
+        const char* reason = stbi_failure_reason();
+        return Err("capture_full_screen_spectacle: failed to decode PNG: " + std::string(reason ? reason : "unknown"));
+    }
+
+    result.w = w;
+    result.h = h;
+    result.data.assign(rgba, rgba + static_cast<size_t>(w) * h * 4);
+    stbi_image_free(rgba);
+
+    return Ok(std::move(result));
+}
+
 Result<capture_result_t> capture_full_screen_wayland()
 {
+    // On KDE Plasma, KWin does not implement the wlr-screencopy protocol so
+    // `grim` will always fail.  The generic XDG portal works, but when called
+    // non-interactively it captures the primary/first-configured output rather
+    // than the monitor the cursor is currently on.  `spectacle -m` is the only
+    // cursor-aware option available on KDE, so try it first.
+    if (is_kde_session())
+    {
+        const Result<capture_result_t> kde_res = capture_full_screen_spectacle();
+        if (kde_res.ok())
+            return kde_res;
+        warn("spectacle capture failed, falling back to portal");
+    }
+
     const Result<capture_result_t> res = capture_full_screen_portal();
     if (res.ok())
         return res;
@@ -191,17 +270,11 @@ Result<capture_result_t> capture_full_screen_wayland()
     const int exit_code = proc.get_exit_status();
 
     if (exit_code != 0)
-    {
-        warn("grim failed with exit code {}", exit_code);
-        return capture_full_screen_portal();
-    }
+        return Err("grim failed with exit code: " + fmt::to_string(exit_code));
 
     // stbi_load_from_memory takes an int length
-    if (buf.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
-    {
-        warn("Screenshot too large to decode (buffer > INT_MAX).");
-        return capture_full_screen_portal();
-    }
+    if (buf.size() > INT_MAX)
+        return Err("Screenshot too large to decode (buffer > INT_MAX).");
 
     int      w = 0, h = 0, comp = 0;
     uint8_t* rgba = stbi_load_from_memory(buf.data(), static_cast<int>(buf.size()), &w, &h, &comp, STBI_rgb_alpha);
@@ -209,8 +282,7 @@ Result<capture_result_t> capture_full_screen_wayland()
     if (!rgba)
     {
         const char* reason = stbi_failure_reason();
-        warn("Failed to read PPM data: {}", reason ? reason : "Unknown");
-        return capture_full_screen_portal();
+        return Err("Failed to read PPM data: " + std::string(reason ? reason : "Unknown"));
     }
 
     result.w = w;
@@ -483,12 +555,11 @@ Result<capture_result_t> capture_full_screen_portal()
 #ifdef __APPLE__
 Result<capture_result_t> capture_full_screen_macos()
 {
-    // Build a unique temp path for the PNG
-    char tmppath[] = "/tmp/oshot_XXXXXX.png";
-    int  fd        = mkstemps(tmppath, 4);  // suffix length = 4 (".png")
-    if (fd < 0)
-        return Err("Failed to create temp file for screenshot");
-    close(fd);
+    capture_result_t result;
+
+    const char* tmppath = create_temp_png();
+    if (!tmppath)
+        return Err("capture_full_screen_spectacle: failed to create temp png");
 
     // -x  suppress shutter sound
     // -t png  force PNG format
@@ -512,7 +583,6 @@ Result<capture_result_t> capture_full_screen_macos()
         return Err("Failed to decode screenshot PNG: " + std::string(reason ? reason : "unknown"));
     }
 
-    capture_result_t result;
     result.w = w;
     result.h = h;
     result.data.assign(rgba, rgba + static_cast<size_t>(w) * h * 4);

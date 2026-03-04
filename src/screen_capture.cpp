@@ -37,6 +37,7 @@
 #  pragma comment(lib, "dxgi")
 #endif
 
+#ifndef _WIN32
 static const char* create_temp_png()
 {
     char tmppath[] = "/tmp/oshot_XXXXXX.png";
@@ -46,8 +47,7 @@ static const char* create_temp_png()
     close(fd);
     return strdup(tmppath);
 }
-
-
+#endif
 
 SessionType get_session_type()
 {

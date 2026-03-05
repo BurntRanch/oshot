@@ -20,6 +20,8 @@
 #    include <X11/Xlib.h>
 #  endif
 
+GLFWwindow* window = nullptr;
+
 void glfw_error_callback(int i_error, const char* description);
 void glfw_drop_callback(GLFWwindow*, int count, const char** paths);
 
@@ -77,8 +79,6 @@ static GLFWmonitor* get_monitor_at_cursor()
 
     return glfwGetPrimaryMonitor();
 }
-
-GLFWwindow* window = nullptr;
 
 void minimize_window()
 {
@@ -185,12 +185,6 @@ int run_main_tool(const std::string& imgui_ini_path)
         glfwTerminate();
         return EXIT_FAILURE;
     }
-
-    // Position the borderless window exactly over the chosen monitor.
-    int mon_x = 0, mon_y = 0;
-    glfwGetMonitorPos(monitor, &mon_x, &mon_y);
-    glfwSetWindowPos(window, mon_x, mon_y);
-
     glfwMakeContextCurrent(window);
     glfwSetDropCallback(window, glfw_drop_callback);
     glfwSwapInterval(1);  // Enable vsync

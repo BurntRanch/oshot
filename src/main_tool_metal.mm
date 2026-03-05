@@ -115,16 +115,21 @@ int run_main_tool(const std::string& imgui_ini_path)
     GLFWmonitor*       monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode    = glfwGetVideoMode(monitor);
 
+    // Pass nullptr as the monitor to get a borderless windowed overlay
+    // instead of exclusive fullscreen. This ensures GLFW_DECORATED,
+    // GLFW_FLOATING, and GLFW_AUTO_ICONIFY hints actually take effect
+    // (they are silently ignored for exclusive fullscreen windows), and
+    // keeps mouse/keyboard events scoped to this monitor so they don't
+    // bleed in from the other display on multi-monitor setups.
     window = glfwCreateWindow(mode->width, mode->height, "oshot", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
         return EXIT_FAILURE;
     }
+    glfwMakeContextCurrent(window);
     glfwSetDropCallback(window, glfw_drop_callback);
-    int mon_x = 0, mon_y = 0;
-    glfwGetMonitorPos(monitor, &mon_x, &mon_y);
-    glfwSetWindowPos(window, mon_x, mon_y);
+    glfwSwapInterval(1);  // Enable vsync
 
     g_scr_w = mode->width;
     g_scr_h = mode->height;

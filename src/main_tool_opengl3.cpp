@@ -30,14 +30,6 @@ void extern_glfw_terminate()
     glfwTerminate();
 }
 
-// RAII guard: ensures glfwTerminate() runs even on crash/signal.
-// Without this, NVIDIA's driver is left in the implicit mode it switched
-// to when we created a full-resolution window, permanently showing 1024x768.
-struct GlfwGuard
-{
-    ~GlfwGuard() { glfwTerminate(); }
-} glfw_guard;
-
 // Returns the GLFW monitor that currently contains the cursor.
 // Falls back to the primary monitor if the cursor position cannot be
 // determined (e.g. on a pure Wayland session without XWayland).

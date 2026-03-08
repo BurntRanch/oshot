@@ -175,6 +175,7 @@ Result<>                 save_png(SavingOp op, const capture_result_t& img);
 
 void minimize_window();  // Defined on main_tool_*
 void maximize_window();  // Defined on main_tool_*
+void extern_glfw_terminate(); // Defined on main_tool_*
 void fit_to_screen(capture_result_t& img);
 void rgba_to_grayscale(const uint8_t* rgba, uint8_t* result, int width, int height);
 
@@ -286,5 +287,14 @@ inline bool ask_user_yn(bool def, const std::string_view fmt, Args&&... args)
     return !def;
 #endif
 }
+
+// RAII guard: ensures glfwTerminate() runs even on crash/signal.
+// Without this, NVIDIA's driver is left in the implicit mode it switched
+// to when we created a full-resolution window, permanently showing 1024x768.
+inline struct GlfwGuard
+{
+    ~GlfwGuard() { extern_glfw_terminate(); }
+} glfw_guard;
+
 
 #endif  // !_UTIL_HPP_

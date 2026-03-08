@@ -25,6 +25,10 @@
 
 void glfw_error_callback(int error, const char* description);
 void glfw_drop_callback(GLFWwindow*, int count, const char** paths);
+void extern_glfw_terminate()
+{
+    glfwTerminate();
+}
 
 GLFWwindow* window = nullptr;
 

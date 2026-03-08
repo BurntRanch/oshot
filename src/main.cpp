@@ -14,8 +14,6 @@
 #include <thread>
 #include <utility>
 
-#include "socket.hpp"
-
 #ifndef _WIN32
 #  include <netdb.h>
 #  include <netinet/in.h>
@@ -31,6 +29,7 @@
 #include "oshot_png.hpp"
 #include "screen_capture.hpp"
 #include "screenshot_tool.hpp"
+#include "socket.hpp"
 #include "switch_fnv1a.hpp"
 #include "tray.hpp"
 #include "util.hpp"
@@ -215,6 +214,9 @@ static std::atomic<bool>       quit{ false };
 static bool                    do_capture = false;
 struct GLFWwindow;
 
+// Avoid dragging glfw headers
+void extern_glfw_terminate();
+
 void exit_handler(int _)
 {
     quit.store(true);
@@ -223,6 +225,7 @@ void exit_handler(int _)
     if (g_sock > 0)
         shutdown(g_sock, SHUT_RDWR);
 #endif
+    extern_glfw_terminate();
     trayMaker.Exit();
 }
 
@@ -350,6 +353,17 @@ int main(int argc, char* argv[])
 
     signal(SIGINT, exit_handler);
     signal(SIGTERM, exit_handler);
+    signal(SIGABRT, exit_handler);
+
+#ifndef _WIN32
+    // SIGSEGV handler: restore display then re-raise so the OS
+    // still generates a core dump.
+    signal(SIGSEGV, [](int sig) {
+        extern_glfw_terminate();  // restore display mode
+        signal(sig, SIG_DFL);     // reset to default
+        raise(sig);               // re-raise for core dump
+    });
+#endif
 
     const std::string& configDir      = get_config_dir().string();
     const std::string& configFile     = parse_config_path(argc, argv, configDir).string();

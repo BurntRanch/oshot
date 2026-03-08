@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(oshot VERSION 0.3.0 LANGUAGES C CXX)
+project(oshot VERSION 0.4.0 LANGUAGES C CXX)
+set(PROJECT_VERSION_SUFFIX "-rc1")
+set(PROJECT_FULL_VERSION "${PROJECT_VERSION}${PROJECT_VERSION_SUFFIX}")
 
 if(APPLE)
     enable_language(OBJC OBJCXX)

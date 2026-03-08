@@ -20,6 +20,7 @@
 
 #include "clipboard.hpp"
 #include "config.hpp"
+#include "fmt/format.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl3_loader.h"
 #include "imgui/imgui_internal.h"
@@ -1037,12 +1038,12 @@ void ScreenshotTool::DrawMenuItems()
         text_display = "More Details:";
         if (ImGui::TreeNode(text_display.data()))
         {
-            ImGui::BeginChild("##scrollable_region", ImVec2(0, 70), false, ImGuiWindowFlags_HorizontalScrollbar);
+            ImGui::BeginChild("##scrollable_region", ImVec2(0, 85), false, ImGuiWindowFlags_HorizontalScrollbar);
 
-            ImGui::Text(
-                "oshot v%s built from branch '%s' at %s commit %s ('%s').\n"
-                "Date: %s\n"
-                "Tag: %s\n",
+            static std::string infos = fmt::format(
+                "oshot v{} built from branch '{}' at {} commit '{}' ({}).\n"
+                "Date: {}\n"
+                "Tag: {}\n",
                 VERSION,
                 GIT_BRANCH,
                 GIT_DIRTY,
@@ -1050,6 +1051,11 @@ void ScreenshotTool::DrawMenuItems()
                 GIT_COMMIT_MESSAGE,
                 GIT_COMMIT_DATE,
                 GIT_TAG);
+
+            ImGui::Text("%s", infos.c_str());
+
+            if (ImGui::Button("Copy text"))
+                g_clipboard->CopyText(infos);
             ImGui::EndChild();
             ImGui::TreePop();
         }

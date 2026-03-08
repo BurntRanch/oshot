@@ -73,7 +73,7 @@ FILE*                      g_fp_log;
 static void version()
 {
     fmt::print(
-        "oshot {} built from branch '{}' at {} commit '{}' ({}).\n"
+        "oshot v{} built from branch '{}' at {} commit '{}' ({}).\n"
         "Date: {}\n"
         "Tag: {}\n",
         VERSION,

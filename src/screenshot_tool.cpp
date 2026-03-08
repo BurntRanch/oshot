@@ -29,6 +29,12 @@
 #include "tool_icons.h"
 #include "util.hpp"
 
+#if (!__has_include("version.h"))
+#  error "version.h not found, please generate it with ./scripts/generateVersion.sh"
+#else
+#  include "version.h"
+#endif
+
 #ifndef GL_NO_ERROR
 #  define GL_NO_ERROR 0
 #endif
@@ -36,6 +42,7 @@
 using namespace std::chrono_literals;
 
 static constexpr ImVec2 origin(0, 0);
+static void*            logo_texture = nullptr;
 
 static std::vector<std::string> get_training_data_list(const std::string& path)
 {
@@ -69,7 +76,7 @@ static void draw_input_text_path(const char*                  label,
                                  const bool                   is_file,
                                  const char*                  filters[],
                                  int                          filter_count,
-                                 const std::function<void()>& func,
+                                 const std::function<void()>& if_edited,
                                  std::string&                 path)
 {
     auto handle_drop = [&]() {
@@ -77,14 +84,14 @@ static void draw_input_text_path(const char*                  label,
         {
             path = g_dropped_paths.back();
             g_dropped_paths.clear();
-            func();
+            if_edited();
         }
     };
 
     const float button_size = ImGui::GetFrameHeight();
     ImGui::PushItemWidth(ImGui::CalcItemWidth() - button_size);
     if (ImGui::InputText(input_id, &path))
-        func();
+        if_edited();
     ImGui::PopItemWidth();
     handle_drop();
 
@@ -102,7 +109,7 @@ static void draw_input_text_path(const char*                  label,
         if (dialog_path)
         {
             path.assign(dialog_path);
-            func();
+            if_edited();
         }
     }
     handle_drop();
@@ -111,24 +118,22 @@ static void draw_input_text_path(const char*                  label,
     ImGui::Text("%s", label);
 }
 
-// executes func() if path is edited
 static void draw_input_text_file(const char*                  label,
                                  const char*                  input_id,
                                  const char*                  filters[],
                                  int                          filter_count,
-                                 const std::function<void()>& func,
+                                 const std::function<void()>& if_edited,
                                  std::string&                 path)
 {
-    draw_input_text_path(label, input_id, true, filters, filter_count, func, path);
+    draw_input_text_path(label, input_id, true, filters, filter_count, if_edited, path);
 }
 
-// executes func() if path is edited
 static void draw_input_text_folder(const char*                  label,
                                    const char*                  input_id,
-                                   const std::function<void()>& func,
+                                   const std::function<void()>& if_edited,
                                    std::string&                 path)
 {
-    draw_input_text_path(label, input_id, false, nullptr, 0, func, path);
+    draw_input_text_path(label, input_id, false, nullptr, 0, if_edited, path);
 }
 
 static HandleHovered flip_handle_x(HandleHovered handle)
@@ -186,10 +191,10 @@ static ImVec4 get_confidence_color(const int confidence)
 {
     if (confidence <= 45)
         return ImVec4(1, 0, 0, 1);  // red
-    else if (confidence <= 80)
+    else if (confidence <= 70)
         return ImVec4(1, 1, 0, 1);  // yellow
-    else
-        return ImVec4(0, 1, 0, 1);  // green
+
+    return ImVec4(0, 1, 0, 1);  // green
 }
 
 Result<> ScreenshotTool::Start()
@@ -260,6 +265,7 @@ Result<> ScreenshotTool::StartWindow()
     m_tool_textures[idx(ToolType::Arrow)] = CreateTexture(nullptr, ICON_ARROW_RGBA, ICON_ARROW_W, ICON_ARROW_H).get();
     m_tool_textures[idx(ToolType::Text)]  = CreateTexture(nullptr, ICON_TEXT_RGBA, ICON_TEXT_W, ICON_TEXT_H).get();
     m_tool_textures[idx(ToolType::Line)]  = CreateTexture(nullptr, ICON_LINE_RGBA, ICON_LINE_W, ICON_LINE_H).get();
+    logo_texture                          = CreateTexture(nullptr, OSHOT_LOGO_RGBA, OSHOT_LOGO_W, OSHOT_LOGO_H).get();
 #endif
 
     return Ok();
@@ -1003,25 +1009,61 @@ void ScreenshotTool::DrawMenuItems()
 
     if (show_about)
     {
-        ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(350, 230), ImGuiCond_FirstUseEver);
         ImGui::Begin("About", &show_about, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
-        ImGui::Text("oshot");
-        ImGui::Separator();
+        float            window_width = ImGui::GetWindowSize().x;
+        std::string_view text_display;
+
+        auto centered_text = [&](const std::string_view text) -> std::string_view {
+            float name_width = ImGui::CalcTextSize(text.data()).x;
+            ImGui::SetCursorPosX((window_width - name_width) / 2);
+            return text;
+        };
+
+        // Center image
+        ImGui::SetCursorPosX((window_width - 24.0f) / 2);
+        ImGui::Image(logo_texture, ImVec2(32, 32));
+
+        // Centered labels
+        text_display = centered_text("oshot v" VERSION);
+        ImGui::Text("%s", text_display.data());
         ImGui::Spacing();
 
-        ImGui::TextWrapped("Screenshot tool to extract text on the fly");
-
+        text_display = centered_text("Screenshot tool to extract text on the fly");
+        ImGui::Text("%s", text_display.data());
         ImGui::Spacing();
-        ImGui::Separator();
 
-        ImGui::Text("Version: " VERSION);
+        // Rest remains left-aligned as normal
+        text_display = "More Details:";
+        if (ImGui::TreeNode(text_display.data()))
+        {
+            ImGui::BeginChild("##scrollable_region", ImVec2(0, 70), false, ImGuiWindowFlags_HorizontalScrollbar);
+
+            ImGui::Text(
+                "oshot v%s built from branch '%s' at %s commit %s ('%s').\n"
+                "Date: %s\n"
+                "Tag: %s\n",
+                VERSION,
+                GIT_BRANCH,
+                GIT_DIRTY,
+                GIT_COMMIT_HASH,
+                GIT_COMMIT_MESSAGE,
+                GIT_COMMIT_DATE,
+                GIT_TAG);
+            ImGui::EndChild();
+            ImGui::TreePop();
+        }
+
+        ImGui::Text("Version: v" VERSION);
         ImGui::Text("Created by: Toni500");
         ImGui::Text("Copyright © 2026");
-
         ImGui::Spacing();
+
+        ImGui::Text("Support the project at ");
+        ImGui::SameLine(0, 1);
+        ImGui::TextLinkOpenURL("Toni500github/oshot", "https://github.com/Toni500github/oshot");
         if (ImGui::Button("Close"))
             show_about = false;
-
         ImGui::End();
     }
 }
@@ -1467,6 +1509,7 @@ void ScreenshotTool::Cancel()
     };
 
     delete_texture(m_texture_id);
+    delete_texture(logo_texture);
     for (void*& tex : m_tool_textures)
         delete_texture(tex);
 

@@ -133,7 +133,7 @@ def create_filled_rectangle_pixels(margin=5):
 
     return pixels
 
-def create_icon_from_image(image_path, threshold=128):
+def create_icon_from_image(image_path, use_rgba=False, threshold=128):
     try:
         from PIL import Image
     except ImportError:
@@ -155,8 +155,10 @@ def create_icon_from_image(image_path, threshold=128):
 
                 # Snap alpha to fully opaque or transparent
                 a = 255 if a >= threshold else 0
-
-                pixels.extend([white, white, white, a])
+                if use_rgba:
+                    pixels.extend([r, g, b, a])
+                else:
+                    pixels.extend([white, white, white, a])
 
         return pixels
 
@@ -200,10 +202,11 @@ def main():
         ("ICON_PENCIL", "/tmp/image.png"),
         ("ICON_ARROW", "/tmp/image2.png"),
         ("ICON_TEXT", "/tmp/text.png")
+         ("OSHOT_LOGO", "./oshot.png", True)
     ]
     
-    for name, image_path in external_images:
-        pixels = create_icon_from_image(image_path)
+    for name, image_path, use_rgba in external_images:
+        pixels = create_icon_from_image(image_path, use_rgba)
         if pixels:
             icons.append((name, pixels))
     

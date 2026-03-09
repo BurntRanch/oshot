@@ -1557,10 +1557,13 @@ bool ScreenshotTool::OpenImage(const std::string& path)
     m_texture_id = r.get();
 #endif
 
-    // Reset everything
+    // Reset interactions.
+    // somes are already reseted from previous calls
     m_state           = ToolState::Selecting;
+    m_current_tool    = ToolType::kNone;
     m_handle_hover    = HandleHovered::kNone;
     m_dragging_handle = HandleHovered::kNone;
+    m_input_owner     = InputOwner::kNone;
 
     m_is_selecting         = false;
     m_selection            = {};
@@ -1568,16 +1571,6 @@ bool ScreenshotTool::OpenImage(const std::string& path)
     m_drag_start_mouse     = {};
     m_image_origin         = {};
     m_image_end            = {};
-
-    m_inputs.ocr_text.clear();
-    m_inputs.barcode_text.clear();
-    m_inputs.ocr_confidence   = {};
-    m_inputs.zbar_scan_result = {};
-
-    ClearError(FailedToInitOcr);
-    ClearError(InvalidPath);
-    ClearError(InvalidModel);
-    ClearError(FailedToExtractBarCode);
 
     return true;
 }

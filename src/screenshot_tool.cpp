@@ -520,6 +520,7 @@ void ScreenshotTool::HandleAnnotationInput()
                 CacheAndGetFont(get_font_path(m_inputs.ann_font).string(), m_current_annotation.thickness);
             ImGui::PushFont(ann_font);
 
+            ImGui::PushStyleColor(ImGuiCol_Text, m_current_annotation.color);
             if (ImGui::InputText(
                     "##text_ann_input_text", &m_current_annotation.text, ImGuiInputTextFlags_EnterReturnsTrue))
             {
@@ -536,7 +537,7 @@ void ScreenshotTool::HandleAnnotationInput()
                 m_current_annotation = {};
                 m_is_text_placing    = false;
             }
-
+            ImGui::PopStyleColor();
             ImGui::PopFont();
 
             if (ImGui::IsKeyPressed(ImGuiKey_Escape))
@@ -1070,7 +1071,9 @@ void ScreenshotTool::DrawMenuItems()
 
         ImGui::Text("Support the project at ");
         ImGui::SameLine(0, 1);
-        ImGui::TextLinkOpenURL("Toni500github/oshot", "https://github.com/Toni500github/oshot");
+        if (ImGui::TextLinkOpenURL("Toni500github/oshot", "https://github.com/Toni500github/oshot"))
+            minimize_window();
+
         if (ImGui::Button("Close"))
             show_about = false;
         ImGui::End();

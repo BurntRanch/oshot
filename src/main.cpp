@@ -358,7 +358,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 int main(int argc, char* argv[])
 {
     std::error_code ec;
-    const fs::path& log_path = fs::temp_directory_path() / "oshot.log";
+    const fs::path& log_path = fs::temp_directory_path(ec) / "oshot.log";
     fs::create_directories(log_path.parent_path(), ec);
     auto file = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_path.string(), true);
 #endif
@@ -509,8 +509,7 @@ int main(int argc, char* argv[])
 #else
     // Basically create the icon.png in a temp directory and use
     // that for the systray icon. idfc, it works
-    const fs::path& png_path = fs::temp_directory_path() / "oshot.png";
-    fs::create_directories(png_path.parent_path(), ec);
+    const fs::path& png_path = fs::temp_directory_path(ec) / "oshot.png";
     std::ofstream out(png_path.string(), std::ios::binary | std::ios::out | std::ios::trunc);
 
     out.write(reinterpret_cast<const char*>(oshot_png), static_cast<std::streamsize>(oshot_png_len));

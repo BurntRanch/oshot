@@ -72,7 +72,7 @@ void Config::OverrideOption(const std::string& opt)
 {
     const size_t pos = opt.find('=');
     if (pos == std::string::npos)
-        die("alias color '{}' does NOT have an equal sign '=' for separating color name and value\n"
+        die("option to override '{}' does NOT have an equal sign '=' for separating name and value\n"
             "For more check with --help",
             opt);
 

@@ -483,6 +483,19 @@ void ScreenshotTool::HandleAnnotationInput()
 {
     const ImVec2& mouse_pos = ImGui::GetMousePos();
 
+    // If the user switched away from the Text tool while a text annotation was
+    // in progress (but not yet committed), cancel it so the placement position
+    // is not left stale.
+    // Without this, the generic drawing code can later
+    // overwrite m_current_annotation (including start.x/y = 0) while
+    // m_is_text_placing stays true, causing the input window to reappear at
+    // position (0, 0) the next time Text is selected.
+    if (m_is_text_placing && m_current_tool != ToolType::Text)
+    {
+        m_current_annotation = {};
+        m_is_text_placing    = false;
+    }
+
     if (m_current_tool == ToolType::Text)
     {
         if (!m_is_text_placing && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ui_blocks_selection())
@@ -537,8 +550,11 @@ void ScreenshotTool::HandleAnnotationInput()
                 m_current_annotation = {};
                 m_is_text_placing    = false;
             }
-            ImGui::PopStyleColor();
             ImGui::PopFont();
+
+            ImGui::Text("Enter: Place | ESC: Cancel");
+
+            ImGui::PopStyleColor();
 
             if (ImGui::IsKeyPressed(ImGuiKey_Escape))
             {

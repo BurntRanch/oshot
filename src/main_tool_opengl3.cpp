@@ -188,7 +188,8 @@ int run_main_tool(const std::string& imgui_ini_path)
     window = glfwCreateWindow(mode->width, mode->height, "oshot", nullptr, nullptr);
     if (!window)
     {
-        glfwTerminate();
+        if (!g_is_systray)
+            glfwTerminate();
         return EXIT_FAILURE;
     }
     glfwMakeContextCurrent(window);
@@ -223,7 +224,8 @@ int run_main_tool(const std::string& imgui_ini_path)
         if (!res.ok())
         {
             error("Failed to start tool window: {}", res.error());
-            glfwTerminate();
+            if (!g_is_systray)
+                glfwTerminate();
             return EXIT_FAILURE;
         }
     }
@@ -270,9 +272,13 @@ int run_main_tool(const std::string& imgui_ini_path)
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
-    glfwTerminate();
+    window = nullptr;
 
-    g_sender->Close();
+    if (!g_is_systray)
+    {
+        glfwTerminate();
+        g_sender->Close();
+    }
 
     return EXIT_SUCCESS;
 }

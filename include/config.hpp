@@ -181,7 +181,7 @@ annotations-in-text-tools = true
 
 # Default font (absolute path or just name) for the whole application.
 # Leave/Make it empty, or commment it, to use ImGUI default font.
-font = "arial.ttf"
+font = "Arial.ttf"
 )#";
 
 inline constexpr std::string_view oshot_help = (R"(Usage: oshot [OPTIONS]...

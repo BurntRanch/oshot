@@ -25,7 +25,7 @@ static int wlcopy_pid = -1;
 
 // Starts wlcopy in the background, forgetting it.
 // Sets wlcopy_pid, and returns an stdin pipe on success.
-Result<int> start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-8")
+Result<int> start_wlcopy(const std::string_view mime_type = "text/plain;charset=utf-8")
 {
 #ifdef __linux__
     // stop if already launched
@@ -41,9 +41,7 @@ Result<int> start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-
 
     int copy_pipe[2];
     if (pipe(copy_pipe) == -1)
-    {
         return Err("Failed to open stdin pipe: " + std::string(strerror(errno)));
-    }
 
     wlcopy_pid = fork();
 
@@ -52,7 +50,9 @@ Result<int> start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-
         close(copy_pipe[1]);
         dup2(copy_pipe[0], STDIN_FILENO);
         close(copy_pipe[0]);
-        execlp("wl-copy", "wl-copy", "--foreground", "--type", mime_type.c_str(), NULL);
+
+        const char* args[] = { "wl-copy", "--foreground", "--type", mime_type.data(), nullptr };
+        execvp("wl-copy", const_cast<char* const*>(args));
 
         exit(-1);
     }
@@ -73,51 +73,44 @@ Result<int> start_wlcopy(const std::string& mime_type = "text/plain;charset=utf-
 
 Result<> Clipboard::CopyText(const std::string& text)
 {
-#ifdef __linux__
     // Fuck you, fuck your software monopoly
     // and fuck your stupid standards that nobody wants to follow
-    if (m_session != SessionType::Wayland)
+    if (m_session == SessionType::Wayland)
     {
-#endif
-        if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD)
+        const Result<int>& res = start_wlcopy();
+        if (!res.ok())
+            return res.error();
+
+        const int fd = res.get();
+
+        if (write(fd, text.c_str(), text.size()) == -1)
         {
-            const Result<>& res = g_sender->Send(text);
-            if (res.ok())
-                return Ok();
-            return Err("Failed to send text to copy: " + res.error_v());
+            close(fd);
+            return Err("Failed to copy text: " + std::string(strerror(errno)));
         }
 
-        if (clip::set_text(text))
-            return Ok();
-        return Err("Failed to copy text into clipboard");
-#ifdef __linux__
-    }
-    Result<int> res = start_wlcopy();
-    if (!res.ok())
-        return res.error();
-
-    int fd = res.get();
-
-    if (write(fd, text.c_str(), text.size()) == -1)
-    {
         close(fd);
-        return Err("Failed to copy text: " + std::string(strerror(errno)));
+        return Ok();
     }
 
-    close(fd);
+    if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD && g_sender->IsConnected())
+    {
+        const Result<>& res = g_sender->Send(text);
+        if (res.ok())
+            return Ok();
+        return Err("Failed to send text to copy: " + res.error_v());
+    }
 
-    return Ok();
-#endif
+    if (clip::set_text(text))
+        return Ok();
+    return Err("Failed to copy text into clipboard");
 }
 
 Result<> Clipboard::CopyImage(const capture_result_t& cap)
 {
     if (cap.w <= 0 || cap.h <= 0)
-        return Err("Image size is 0");
+        return Err("Image size is empty");
 
-    std::string err;
-
-#ifdef __linux__
     if (m_session == SessionType::Wayland)
     {
         std::vector<uint8_t> png;
@@ -125,12 +118,9 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
 
         svpng(&png, cap.w, cap.h, cap.view().data(), 1);
 
-        Result<int> res = start_wlcopy("image/png");
-
+        const Result<int>& res = start_wlcopy("image/png");
         if (!res.ok())
-        {
             return res.error();
-        }
 
         int fd = res.get();
 
@@ -144,19 +134,15 @@ Result<> Clipboard::CopyImage(const capture_result_t& cap)
 
         return Ok();
     }
-#endif
 
-    if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD)
+    if (!g_is_systray && !OSHOT_TOOL_ON_MAIN_THREAD && g_sender->IsConnected())
     {
-        const uint32_t w_be = htonl(static_cast<uint32_t>(cap.w));
-        const uint32_t h_be = htonl(static_cast<uint32_t>(cap.h));
-
         const size_t         size = static_cast<size_t>(cap.w) * cap.h * 4;
         std::vector<uint8_t> payload;
         payload.resize(8 + size);
 
-        std::memcpy(payload.data() + 0, &w_be, 4);
-        std::memcpy(payload.data() + 4, &h_be, 4);
+        std::memcpy(payload.data() + 0, &cap.w, 4);
+        std::memcpy(payload.data() + 4, &cap.h, 4);
         std::memcpy(payload.data() + 8, cap.view().data(), size);
 
         const Result<>& res = g_sender->Send(SendMsg::Image, payload.data(), payload.size());

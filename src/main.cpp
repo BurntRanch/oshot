@@ -218,6 +218,9 @@ static std::mutex              mtx;
 static std::condition_variable cv;
 static std::atomic<bool>       quit{ false };
 static bool                    do_capture = false;
+static capture_result_t        pending_image;
+static bool                    do_copy_image = false;
+
 struct GLFWwindow;
 
 // Avoid dragging glfw headers
@@ -254,13 +257,21 @@ void capture_worker(const std::string& imgui_ini_path)
     {
         // wait for command
         std::unique_lock lk(mtx);
-        cv.wait(lk, [] { return quit.load() || do_capture; });
+        cv.wait(lk, [] { return quit.load() || do_capture || do_copy_image; });
         if (quit.load())
             break;
 
+        if (do_copy_image)
+        {
+            do_copy_image = false;
+            capture_result_t img = std::move(pending_image);
+            lk.unlock();
+            g_clipboard->CopyImage(img);
+            continue;
+        }
+
         do_capture = false;
         lk.unlock();
-
         run_main_tool(imgui_ini_path);
     }
 }
@@ -357,6 +368,10 @@ int main(int argc, char* argv[])
 
 #endif
 
+#ifdef __linux__
+    XInitThreads();
+#endif
+
     signal(SIGINT, exit_handler);
     signal(SIGTERM, exit_handler);
     signal(SIGABRT, exit_handler);
@@ -426,12 +441,11 @@ int main(int argc, char* argv[])
                 continue;
             }
 
-            char     type    = 0;
-            uint32_t net_len = 0;
+            char     type = 0;
+            uint32_t len  = 0;
 
-            bool ok = recv_all(client, &type, 1) && recv_all(client, &net_len, sizeof(net_len));
+            bool ok = recv_all(client, &type, 1) && recv_all(client, &len, sizeof(len));
 
-            const uint32_t       len = ntohl(net_len);
             std::vector<uint8_t> payload;
             payload.resize(len);
 
@@ -453,12 +467,10 @@ int main(int argc, char* argv[])
                 if (payload.size() < 8)
                     continue;
 
-                uint32_t w_be = 0, h_be = 0;
-                std::memcpy(&w_be, payload.data() + 0, 4);
-                std::memcpy(&h_be, payload.data() + 4, 4);
+                int w = 0, h = 0;
+                std::memcpy(&w, payload.data() + 0, 4);
+                std::memcpy(&h, payload.data() + 4, 4);
 
-                const int w = static_cast<int>(ntohl(w_be));
-                const int h = static_cast<int>(ntohl(h_be));
                 if (w <= 0 || h <= 0)
                     continue;
 
@@ -466,8 +478,16 @@ int main(int argc, char* argv[])
                 if (payload.size() != expected + 8)
                     continue;
 
-                capture_result_t cap{ std::move(payload), w, h };
-                g_clipboard->CopyImage(cap);
+                // Strip the 8-byte header
+                std::vector<uint8_t> pixel_data(std::make_move_iterator(payload.begin() + 8),
+                                                std::make_move_iterator(payload.end()));
+                capture_result_t     cap{ std::move(pixel_data), w, h };
+                {
+                    std::lock_guard lk(mtx);
+                    pending_image = std::move(cap);
+                    do_copy_image = true;
+                    cv.notify_all();
+                }
             }
         }
         close(g_sock);

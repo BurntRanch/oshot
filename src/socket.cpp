@@ -57,8 +57,8 @@ Result<> SocketSender::Send(SendMsg msg, const void* src, size_t size)
     if (send(m_sock, &type, 1, 0) != 1)
         return Err("Failed to send message type: " + std::string(strerror(errno)));
 
-    uint32_t net_len = htonl(static_cast<uint32_t>(size));  // network byte order
-    if (send(m_sock, reinterpret_cast<const char*>(&net_len), sizeof(net_len), 0) != sizeof(net_len))
+    const uint32_t len = static_cast<uint32_t>(size);
+    if (send(m_sock, reinterpret_cast<const char*>(&len), sizeof(len), 0) != sizeof(len))
         return Err("Failed to send message size: " + std::string(strerror(errno)));
 
     const char* buf = reinterpret_cast<const char*>(src);

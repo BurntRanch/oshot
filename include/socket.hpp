@@ -28,6 +28,7 @@ public:
     Result<> Send(const std::string& text);
     Result<> Send(SendMsg msg, const void* src, size_t size);
 
+    bool IsConnected() { return m_sock >= 0; }
     void Close();
 
 private:

@@ -202,6 +202,7 @@ private:
     ImVec2 m_image_origin;
     ImVec2 m_image_end;
 
+    std::vector<std::string>                                       m_ocr_models_list;
     std::unordered_map<ErrorFlag, std::string>                     m_err_texts;
     std::map<std::pair<std::string, float>, font_cache_t>          m_font_cache;
     std::function<void()>                                          m_on_cancel;
@@ -220,6 +221,8 @@ private:
     bool                                    m_is_drawing       = false;
     bool                                    m_is_color_picking = false;
     bool                                    m_is_text_placing  = false;
+
+    void RefreshOcrModels();
 
     void HandleShortcutsInput();
     void HandleSelectionInput();

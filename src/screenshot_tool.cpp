@@ -241,6 +241,7 @@ Result<> ScreenshotTool::StartWindow()
     m_show_text_tools = g_config->File.show_text_tools;
 
     fit_to_screen(m_screenshot);
+    RefreshOcrModels();
 
 #ifdef __APPLE__
     m_texture_id = nullptr;  // will be set by backend
@@ -1104,34 +1105,13 @@ void ScreenshotTool::DrawOcrTools()
     std::string& ocr_path  = m_inputs.ocr_path;
     std::string& ocr_model = m_inputs.ocr_model;
 
-    static size_t                   item_selected_idx = 0;
-    static bool                     first_frame       = true;
-    static std::vector<std::string> models_list;
+    static size_t item_selected_idx = 0;
 
     auto refresh_models = [&]() {
-        models_list = get_training_data_list(ocr_path);
-        if (models_list.empty())
-        {
-            SetError(InvalidPath);
-        }
-        else
-        {
-            ClearError(InvalidPath);
-            // Find current model in list
-            const auto& it    = std::find(models_list.begin(), models_list.end(), ocr_model);
-            item_selected_idx = (it != models_list.end()) ? std::distance(models_list.begin(), it) : 0;
-            if (it == models_list.end())
-                SetError(InvalidModel);
-            else
-                ClearError(InvalidModel);
-        }
+        RefreshOcrModels();
+        const auto& it    = std::find(m_ocr_models_list.begin(), m_ocr_models_list.end(), m_inputs.ocr_model);
+        item_selected_idx = (it != m_ocr_models_list.end()) ? std::distance(m_ocr_models_list.begin(), it) : 0;
     };
-
-    if (first_frame)
-    {
-        refresh_models();
-        first_frame = false;
-    }
 
     ImGui::PushID("OcrTools");
     ImGui::SeparatorText("OCR");
@@ -1170,15 +1150,15 @@ void ScreenshotTool::DrawOcrTools()
             ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
             filter.Draw("##Filter", -FLT_MIN);
 
-            for (size_t i = 0; i < models_list.size(); ++i)
+            for (size_t i = 0; i < m_ocr_models_list.size(); ++i)
             {
                 bool is_selected = (item_selected_idx == i);
-                if (filter.PassFilter(models_list[i].c_str()))
+                if (filter.PassFilter(m_ocr_models_list[i].c_str()))
                 {
-                    if (ImGui::Selectable(models_list[i].c_str(), is_selected))
+                    if (ImGui::Selectable(m_ocr_models_list[i].c_str(), is_selected))
                     {
                         item_selected_idx = i;
-                        ocr_model         = models_list[i];
+                        ocr_model         = m_ocr_models_list[i];
                         ClearError(InvalidModel);
                     }
                 }
@@ -1972,6 +1952,24 @@ ImFont* ScreenshotTool::CacheAndGetFont(const std::string& font_path, const floa
         m_io.Fonts->Build();
 
     return font;
+}
+
+void ScreenshotTool::RefreshOcrModels()
+{
+    m_ocr_models_list = get_training_data_list(m_inputs.ocr_path);
+    if (m_ocr_models_list.empty())
+    {
+        SetError(InvalidPath);
+    }
+    else
+    {
+        ClearError(InvalidPath);
+        const auto& it = std::find(m_ocr_models_list.begin(), m_ocr_models_list.end(), m_inputs.ocr_model);
+        if (it == m_ocr_models_list.end())
+            SetError(InvalidModel);
+        else
+            ClearError(InvalidModel);
+    }
 }
 
 Result<void*> ScreenshotTool::CreateTexture(void* tex, std::span<const uint8_t> data, int w, int h)

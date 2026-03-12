@@ -164,10 +164,10 @@ fs::path get_config_dir();
 Result<capture_result_t> load_image_rgba(const std::string& path);
 Result<>                 save_png(SavingOp op, const capture_result_t& img);
 
-void minimize_window();        // Defined on main_tool_*
-void maximize_window();        // Defined on main_tool_*
-void extern_glfw_terminate();  // Defined on main_tool_*
-void extern_glfw_swap_interval(int v);  // Defined on main_tool_*
+void minimize_window();               // Defined on main_tool_*
+void maximize_window();               // Defined on main_tool_*
+void extern_glfwTerminate();          // Defined on main_tool_*
+void extern_glfwSwapInterval(int v);  // Defined on main_tool_*
 void fit_to_screen(capture_result_t& img);
 void rgba_to_grayscale(const uint8_t* rgba, uint8_t* result, int width, int height);
 
@@ -255,7 +255,7 @@ inline bool ask_user_yn(bool def, const std::string_view fmt, Args&&... args)
 // to when we created a full-resolution window, permanently showing 1024x768.
 inline struct GlfwGuard
 {
-    ~GlfwGuard() { extern_glfw_terminate(); }
+    ~GlfwGuard() { extern_glfwTerminate(); }
 } glfw_guard;
 
 #endif  // !_UTIL_HPP_

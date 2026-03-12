@@ -221,7 +221,7 @@ static bool                    do_copy_image = false;
 struct GLFWwindow;
 
 // Avoid dragging glfw headers
-void extern_glfw_terminate();
+void extern_glfwTerminate();
 
 void exit_handler(int _)
 {
@@ -231,7 +231,7 @@ void exit_handler(int _)
     if (g_sock > 0)
         shutdown(g_sock, SHUT_RDWR);
 #endif
-    extern_glfw_terminate();
+    extern_glfwTerminate();
     trayMaker.Exit();
 }
 
@@ -382,9 +382,9 @@ int main(int argc, char* argv[])
     // Restore display then re-raise so the OS
     // still generates a core dump.
     signal(SIGSEGV, [](int sig) {
-        extern_glfw_terminate();  // restore display mode
-        signal(sig, SIG_DFL);     // reset to default
-        raise(sig);               // re-raise for core dump
+        extern_glfwTerminate();  // restore display mode
+        signal(sig, SIG_DFL);    // reset to default
+        raise(sig);              // re-raise for core dump
     });
 #endif
 

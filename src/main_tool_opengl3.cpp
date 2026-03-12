@@ -26,13 +26,11 @@ GLFWwindow* window = nullptr;
 
 void glfw_error_callback(int i_error, const char* description);
 void glfw_drop_callback(GLFWwindow*, int count, const char** paths);
-
-void extern_glfw_terminate()
+void extern_glfwTerminate()
 {
     glfwTerminate();
 }
-
-void extern_glfw_swap_interval(int v)
+void extern_glfwSwapInterval(int v)
 {
     glfwSwapInterval(v);
 }

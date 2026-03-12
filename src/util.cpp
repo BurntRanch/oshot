@@ -235,8 +235,7 @@ void fit_to_screen(capture_result_t& img)
 
     std::vector<uint8_t> resized(new_w * new_h * 4);
 
-    bool ok =
-        stbir_resize_uint8_linear(img.data.data(), img_w, img_h, 0, resized.data(), new_w, new_h, 0, STBIR_RGBA);
+    bool ok = stbir_resize_uint8_linear(img.data.data(), img_w, img_h, 0, resized.data(), new_w, new_h, 0, STBIR_RGBA);
 
     if (!ok)
         return;

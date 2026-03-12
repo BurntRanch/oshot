@@ -57,7 +57,6 @@ public:
         std::string source_file;
         int         preferred_psm    = 0;
         bool        enable_handles   = true;
-        bool        enable_vsync     = true;
         bool        only_launch_tray = false;
         bool        only_launch_gui  = false;
 #if DEBUG || (defined(_WIN32) && WINDOWS_CMD)

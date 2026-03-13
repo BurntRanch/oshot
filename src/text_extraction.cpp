@@ -1,5 +1,6 @@
 #include "text_extraction.hpp"
 
+#include <tesseract/publictypes.h>
 #include <zbar.h>
 
 #include <algorithm>
@@ -13,7 +14,9 @@
 #include "screen_capture.hpp"
 #include "util.hpp"
 
-// ---------------------
+using namespace spdlog;
+
+// --------------------
 // OCR
 // --------------------
 static std::string psm_to_str(tesseract::PageSegMode psm)
@@ -41,32 +44,18 @@ static tesseract::PageSegMode choose_psm(int w, int h)
     const size_t area   = static_cast<size_t>(w) * h;
     const float  aspect = (h > 0) ? static_cast<float>(w) / static_cast<float>(h) : 1.0f;
 
+    debug("Choosing PSM, area: {}*{}={}, aspect: {}", w, h, area, aspect);
+
     // Single character: tiny and roughly square
     if (area < 2'500 && aspect > 0.3f && aspect < 3.0f)
         return PSM_SINGLE_CHAR;
 
     // Single word: small area, not excessively wide
-    if (area < 15'000 && aspect < 5.0f)
+    if (area < 15'000 && aspect > 0.3f && aspect < 5.0f)
         return PSM_SINGLE_WORD;
 
-    // Single line: wide-and-short, or very small height regardless of width.
-    // Guard with absolute height: a wide multi-line block also has high aspect,
-    // so aspect alone is not enough. A single text line is never taller than ~80px
-    // at normal DPI; after the 2x upscale in preprocess_pix that becomes ~160px.
-    if (aspect > 4.0f && h < w / 4 && h < 160)
-        return PSM_SINGLE_LINE;
-
-    // Vertical text: tall and narrow (e.g. rotated sidebar labels)
-    if (aspect < 0.25f)
-        return PSM_SINGLE_BLOCK_VERT_TEXT;
-
-    // Large/sparse region (full screen, desktop, busy UI panel)
-    // Sparse text avoids Tesseract choking on whitespace-heavy layouts
-    if (area > 500'000)
-        return PSM_SPARSE_TEXT;
-
-    // Mid-size blocks: paragraphs, dialog boxes, panels
-    return PSM_SINGLE_BLOCK;
+    // AUTO_OSD is good enough to take care of the rest.
+    return PSM_AUTO_OSD;
 }
 
 static PIX* preprocess_pix(PIX* src)

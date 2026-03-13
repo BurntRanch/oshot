@@ -12,10 +12,15 @@
 #include "screen_capture.hpp"
 #include "util.hpp"
 
+// ------------------------------
+// OCR (tesseract img2text)
+// ------------------------------
 struct ocr_result_t
 {
     std::string data;
-    int         confidence = 0;  // 0..100
+    int         confidence = -1;  // 0..100
+    int         psm;
+    std::string psm_str;
 };
 
 class OcrAPI
@@ -59,6 +64,9 @@ private:
     bool                                    m_initialized = false;
 };
 
+// ------------------------------
+// Zbar (QR/Bar Codes)
+// ------------------------------
 struct zbar_result_t
 {
     std::vector<std::string>             datas;        // decoded payload

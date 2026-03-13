@@ -1181,51 +1181,58 @@ void ScreenshotTool::DrawOcrTools()
         const Result<>& res = m_ocr_api.Configure(ocr_path.c_str(), ocr_model.c_str());
         if (!res.ok())
         {
-            SetError(FailedToInitOcr, res.error_v());
+            SetError(FailedToScanOcr, res.error_v());
         }
         else
         {
-            ClearError(FailedToInitOcr);
-            const Result<ocr_result_t>& result = m_ocr_api.ExtractTextCapture(GetFinalImage(true));
+            ClearError(FailedToScanOcr);
+            Result<ocr_result_t> result = m_ocr_api.ExtractTextCapture(GetFinalImage(true));
             if (result.ok())
-            {
-                m_inputs.ocr_text       = result.get().data;
-                m_inputs.ocr_confidence = result.get().confidence;
-            }
+                m_inputs.ocr_results = std::move(result.get());
         }
     }
 
-    if (HasError(FailedToInitOcr))
+    HelpMarker("If the result seems off, you could try selecting an option in Edit > Optimize OCR for...");
+
+    if (HasError(FailedToScanOcr))
     {
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Failed to init OCR!");
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Failed to scan image: %s", GetError(FailedToScanOcr).c_str());
     }
 
     if (!HasError(InvalidModel) && !HasError(InvalidPath))
     {
         ImGui::SameLine();
-        HelpMarker("If the result seems off, you could try selecting an option in Edit > Optimize OCR for...");
-    }
+        if (m_inputs.ocr_results.confidence && ImGui::TreeNode("Details"))
+        {
+            ImGui::Text("Confidence score:");
+            ImGui::SameLine();
+            ImGui::TextColored(
+                get_confidence_color(m_inputs.ocr_results.confidence), "%d%%", m_inputs.ocr_results.confidence);
 
-    if (m_inputs.ocr_confidence != -1)
-    {
-        ImGui::TextColored(get_confidence_color(m_inputs.ocr_confidence), "%d%%", m_inputs.ocr_confidence);
-        ImGui::SameLine();
-        HelpMarker("Confidence score");
+            ImGui::Text("Using PSM for: %s", m_inputs.ocr_results.psm_str.c_str());
+            ImGui::TreePop();
+        }
     }
 
     ImGui::InputTextMultiline("##source",
-                              &m_inputs.ocr_text,
+                              &m_inputs.ocr_results.data,
                               ImVec2(-1, ImGui::GetTextLineHeight() * 10),
                               g_config->File.allow_out_edit ? 0 : ImGuiInputTextFlags_ReadOnly);
 
-    if (!m_inputs.ocr_text.empty() && ImGui::Button("Copy Text"))
+    if (m_inputs.ocr_results.data.empty())
     {
-        if (m_inputs.ocr_text.back() == '\n')
-            m_inputs.ocr_text.pop_back();
-        const Result<>& res = g_clipboard->CopyText(m_inputs.ocr_text);
+        ImGui::PopID();
+        return;
+    }
+
+    if (ImGui::Button("Copy Text"))
+    {
+        if (m_inputs.ocr_results.data.back() == '\n')
+            m_inputs.ocr_results.data.pop_back();
+        const Result<>& res = g_clipboard->CopyText(m_inputs.ocr_results.data);
         if (!res.ok())
-            error("Failed to copy text: " + res.error_v());
+            error("Failed to copy text: {}", res.error_v());
     }
 
     ImGui::PopID();
@@ -1241,26 +1248,23 @@ void ScreenshotTool::DrawBarDecodeTools()
         const Result<zbar_result_t>& scan = m_zbar_api.ExtractTextsCapture(GetFinalImage(true));
         if (!scan.ok())
         {
-            SetError(FailedToExtractBarCode, scan.error_v());
+            SetError(FailedToScanBarCode, scan.error_v());
         }
         else
         {
             m_inputs.zbar_scan_result = std::move(scan.get());
             for (const auto& data : m_inputs.zbar_scan_result.datas)
                 m_inputs.barcode_text += data + "\n\n";
-            ClearError(FailedToExtractBarCode);
+            ClearError(FailedToScanBarCode);
         }
     }
 
-    if (HasError(FailedToExtractBarCode))
+    if (HasError(FailedToScanBarCode))
     {
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-        m_inputs.barcode_text = "Failed to extract text from bar code: " + m_err_texts[FailedToExtractBarCode];
-        ImGui::InputTextMultiline("##barcode",
-                                  &m_inputs.barcode_text,
-                                  ImVec2(-1, ImGui::GetTextLineHeight() * 10),
-                                  g_config->File.allow_out_edit ? 0 : ImGuiInputTextFlags_ReadOnly);
-
+        ImGui::SameLine();
+        ImGui::TextColored(
+            ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Failed to decode scan: %s", GetError(FailedToScanBarCode).c_str());
         ImGui::PopStyleColor();
     }
     else
@@ -1272,19 +1276,20 @@ void ScreenshotTool::DrawBarDecodeTools()
                 ImGui::BulletText("%s (x%d)", sym.c_str(), count);
             ImGui::TreePop();
         }
-        ImGui::InputTextMultiline("##barcode",
-                                  &m_inputs.barcode_text,
-                                  ImVec2(-1, ImGui::GetTextLineHeight() * 10),
-                                  g_config->File.allow_out_edit ? 0 : ImGuiInputTextFlags_ReadOnly);
     }
 
-    if (!HasError(FailedToExtractBarCode) && !m_inputs.barcode_text.empty() && ImGui::Button("Copy Text"))
+    ImGui::InputTextMultiline("##barcode",
+                              &m_inputs.barcode_text,
+                              ImVec2(-1, ImGui::GetTextLineHeight() * 10),
+                              g_config->File.allow_out_edit ? 0 : ImGuiInputTextFlags_ReadOnly);
+
+    if (!m_inputs.barcode_text.empty() && ImGui::Button("Copy Text"))
     {
         if (m_inputs.barcode_text.back() == '\n')
             m_inputs.barcode_text.pop_back();
         const Result<>& res = g_clipboard->CopyText(m_inputs.barcode_text);
         if (!res.ok())
-            error("Failed to copy text: " + res.error_v());
+            error("Failed to copy text: {}", res.error_v());
     }
 
     ImGui::PopID();

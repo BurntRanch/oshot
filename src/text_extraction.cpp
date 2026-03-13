@@ -16,11 +16,30 @@
 
 using namespace spdlog;
 
+// --------------------
 // OCR
+// --------------------
+static std::string psm_to_str(tesseract::PageSegMode psm)
+{
+    using namespace tesseract;
+    switch (psm)
+    {
+        case PSM_SINGLE_CHAR:            return "Single character";
+        case PSM_SINGLE_WORD:            return "Single word";
+        case PSM_SINGLE_LINE:            return "Single line";
+        case PSM_SINGLE_BLOCK_VERT_TEXT: return "Vertical block";
+        case PSM_SPARSE_TEXT:            return "Sparsed text - big region";
+        case PSM_SINGLE_BLOCK:           return "Mid-size block";
+        default:                         return "Unknown";
+    }
+}
+
 static tesseract::PageSegMode choose_psm(int w, int h)
 {
+    using namespace tesseract;
+
     if (g_config->Runtime.preferred_psm != 0)
-        return static_cast<tesseract::PageSegMode>(g_config->Runtime.preferred_psm);
+        return static_cast<PageSegMode>(g_config->Runtime.preferred_psm);
 
     const size_t area   = static_cast<size_t>(w) * h;
     const float  aspect = (h > 0) ? static_cast<float>(w) / static_cast<float>(h) : 1.0f;
@@ -29,14 +48,14 @@ static tesseract::PageSegMode choose_psm(int w, int h)
 
     // Single character: tiny and roughly square
     if (area < 2'500 && aspect > 0.3f && aspect < 3.0f)
-        return tesseract::PSM_SINGLE_CHAR;
+        return PSM_SINGLE_CHAR;
 
     // Single word: small area, not excessively wide
     if (area < 15'000 && aspect > 0.3f && aspect < 5.0f)
-        return tesseract::PSM_SINGLE_WORD;
+        return PSM_SINGLE_WORD;
 
     // AUTO_OSD is good enough to take care of the rest.
-    return tesseract::PSM_AUTO_OSD;
+    return PSM_AUTO_OSD;
 }
 
 static PIX* preprocess_pix(PIX* src)
@@ -246,7 +265,9 @@ Result<ocr_result_t> OcrAPI::ExtractTextCapture(const capture_result_t& cap)
     if (data.empty())
         return Err("String is empty");
 
-    ret.data = std::move(data);
+    ret.data    = std::move(data);
+    ret.psm_str = psm_to_str(psm);
+    ret.psm     = std::move(psm);
 
     if (tesseract::ResultIterator* ri = m_api->GetIterator())
     {
@@ -273,7 +294,9 @@ Result<ocr_result_t> OcrAPI::ExtractTextCapture(const capture_result_t& cap)
     return Ok(std::move(ret));
 }
 
+// ---------------
 // Zbar
+// ---------------
 ZbarAPI::ZbarAPI()
 {
     SetConfig(zbar::ZBAR_NONE, true);  // enable all

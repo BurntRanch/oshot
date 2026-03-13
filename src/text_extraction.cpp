@@ -13,41 +13,60 @@
 #include "screen_capture.hpp"
 #include "util.hpp"
 
+// ---------------------
 // OCR
+// --------------------
+static std::string psm_to_str(tesseract::PageSegMode psm)
+{
+    using namespace tesseract;
+    switch (psm)
+    {
+        case PSM_SINGLE_CHAR:            return "Single character";
+        case PSM_SINGLE_WORD:            return "Single word";
+        case PSM_SINGLE_LINE:            return "Single line";
+        case PSM_SINGLE_BLOCK_VERT_TEXT: return "Vertical block";
+        case PSM_SPARSE_TEXT:            return "Sparsed text - big region";
+        case PSM_SINGLE_BLOCK:           return "Mid-size block";
+        default:                         return "Unknown";
+    }
+}
+
 static tesseract::PageSegMode choose_psm(int w, int h)
 {
+    using namespace tesseract;
+
     if (g_config->Runtime.preferred_psm != 0)
-        return static_cast<tesseract::PageSegMode>(g_config->Runtime.preferred_psm);
+        return static_cast<PageSegMode>(g_config->Runtime.preferred_psm);
 
     const size_t area   = static_cast<size_t>(w) * h;
     const float  aspect = (h > 0) ? static_cast<float>(w) / static_cast<float>(h) : 1.0f;
 
     // Single character: tiny and roughly square
     if (area < 2'500 && aspect > 0.3f && aspect < 3.0f)
-        return tesseract::PSM_SINGLE_CHAR;
+        return PSM_SINGLE_CHAR;
 
     // Single word: small area, not excessively wide
     if (area < 15'000 && aspect < 5.0f)
-        return tesseract::PSM_SINGLE_WORD;
+        return PSM_SINGLE_WORD;
 
     // Single line: wide-and-short, or very small height regardless of width.
     // Guard with absolute height: a wide multi-line block also has high aspect,
     // so aspect alone is not enough. A single text line is never taller than ~80px
     // at normal DPI; after the 2x upscale in preprocess_pix that becomes ~160px.
     if (aspect > 4.0f && h < w / 4 && h < 160)
-        return tesseract::PSM_SINGLE_LINE;
+        return PSM_SINGLE_LINE;
 
     // Vertical text: tall and narrow (e.g. rotated sidebar labels)
     if (aspect < 0.25f)
-        return tesseract::PSM_SINGLE_BLOCK_VERT_TEXT;
+        return PSM_SINGLE_BLOCK_VERT_TEXT;
 
     // Large/sparse region (full screen, desktop, busy UI panel)
     // Sparse text avoids Tesseract choking on whitespace-heavy layouts
     if (area > 500'000)
-        return tesseract::PSM_SPARSE_TEXT;
+        return PSM_SPARSE_TEXT;
 
     // Mid-size blocks: paragraphs, dialog boxes, panels
-    return tesseract::PSM_SINGLE_BLOCK;
+    return PSM_SINGLE_BLOCK;
 }
 
 static PIX* preprocess_pix(PIX* src)
@@ -257,7 +276,9 @@ Result<ocr_result_t> OcrAPI::ExtractTextCapture(const capture_result_t& cap)
     if (data.empty())
         return Err("String is empty");
 
-    ret.data = std::move(data);
+    ret.data    = std::move(data);
+    ret.psm_str = psm_to_str(psm);
+    ret.psm     = std::move(psm);
 
     if (tesseract::ResultIterator* ri = m_api->GetIterator())
     {
@@ -284,7 +305,9 @@ Result<ocr_result_t> OcrAPI::ExtractTextCapture(const capture_result_t& cap)
     return Ok(std::move(ret));
 }
 
+// ---------------
 // Zbar
+// ---------------
 ZbarAPI::ZbarAPI()
 {
     SetConfig(zbar::ZBAR_NONE, true);  // enable all

@@ -70,10 +70,10 @@ enum class InputOwner
 enum ErrorFlag : size_t
 {
     kNone = 0,
-    FailedToInitOcr,
+    FailedToScanOcr,
     InvalidPath,
     InvalidModel,
-    FailedToExtractBarCode,
+    FailedToScanBarCode,
     COUNT
 };
 
@@ -108,9 +108,7 @@ struct annotation_t
 class ScreenshotTool
 {
 public:
-    ScreenshotTool()
-        : m_io(dummy), m_inputs{ .ocr_path = g_config->File.ocr_path, .ocr_model = g_config->File.ocr_model }
-    {}
+    ScreenshotTool() : m_io(dummy), m_inputs{ g_config->File.ocr_path, g_config->File.ocr_model, {}, "", {}, "" } {}
 
     Result<>          Start();
     Result<>          StartWindow();
@@ -135,8 +133,9 @@ public:
         m_errors.set(static_cast<size_t>(f));
         m_err_texts[f] = err;
     }
-    void ClearError(ErrorFlag f) { m_errors.reset(static_cast<size_t>(f)); }
-    bool HasError(ErrorFlag f) const { return m_errors.test(static_cast<size_t>(f)); }
+    const std::string& GetError(ErrorFlag f) { return m_err_texts[f]; }
+    void               ClearError(ErrorFlag f) { m_errors.reset(static_cast<size_t>(f)); }
+    bool               HasError(ErrorFlag f) const { return m_errors.test(static_cast<size_t>(f)); }
 
     void SetOnComplete(const std::function<void(SavingOp, const Result<capture_result_t>&)>& cb)
     {
@@ -163,14 +162,13 @@ private:
         ImRect        rect;
     };
 
-    // Contains both user input text
-    // and also some user settings
+    // Contains user inputs, APIs results,
+    // and maybe some user settings
     struct inputs_results_t
     {
-        std::string ocr_path;
-        std::string ocr_model;
-        std::string ocr_text;
-        int         ocr_confidence = -1;
+        std::string  ocr_path;
+        std::string  ocr_model;
+        ocr_result_t ocr_results;
 
         std::string   barcode_text;
         zbar_result_t zbar_scan_result;

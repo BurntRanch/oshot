@@ -26,7 +26,7 @@
 #include "fmt/base.h"
 #include "fmt/compile.h"
 #include "getopt_port/getopt.h"
-#include "oshot_png.hpp"
+#include "oshot_png.h"
 #include "screen_capture.hpp"
 #include "screenshot_tool.hpp"
 #include "socket.hpp"

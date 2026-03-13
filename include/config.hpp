@@ -46,8 +46,6 @@ public:
         bool        show_text_tools  = true;
         bool        enable_vsync     = true;
         bool        render_anns      = true;
-
-        std::unordered_map<std::string, std::string> lang_fonts_paths;
     } File;
 
     // Only from CLI arguments

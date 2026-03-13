@@ -53,21 +53,6 @@ void Config::LoadConfigFile(const std::string& filename)
 
     File.allow_out_edit = GetValue<bool>("default.allow-edit-ocr", false);  // deprecated
     File.allow_out_edit = GetValue<bool>("default.allow-text-edit", File.allow_out_edit);
-
-    const toml::table* all_langs_tbl = m_tbl["lang"].as_table();
-    if (!all_langs_tbl)
-        return;
-
-    for (const auto& [lang_code, lang_node] : *all_langs_tbl)
-    {
-        const toml::table* lang_tbl = lang_node.as_table();
-        if (!lang_tbl)
-            continue;
-
-        const std::optional<std::string>& font_str = lang_tbl->at_path("font").value<std::string>();
-        if (font_str)
-            this->File.lang_fonts_paths[lang_code.data()] = font_str.value();
-    }
 }
 
 void Config::OverrideOption(const std::string& opt)

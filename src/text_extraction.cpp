@@ -126,13 +126,12 @@ static PIX* preprocess_pix(PIX* src)
     if (bin_for_skew)
         pixDestroy(&bin_for_skew);
 
-    // Sauvola binarization
-    PIX* bin = nullptr;
-    if (pixSauvolaBinarize(result_gray, 20, 0.35f, 1, nullptr, nullptr, nullptr, &bin) != 0 || !bin)
-        bin = pixThresholdToBinary(result_gray, 128);
-
-    pixDestroy(&result_gray);
-    return bin;
+    // Let Tesseract's LSTM engine do its own internal binarization.
+    // Pre-binarizing (e.g. Sauvola) strips gradient information that LSTM uses for
+    // stroke-width estimation. This is especially damaging for CJK scripts where
+    // fine stroke detail distinguishes many characters. The CLI tool works because
+    // it passes the raw image; we must do the same.
+    return result_gray;
 }
 
 static Pix* rgba_to_pix(std::span<const uint8_t> rgba, int w, int h)
@@ -225,8 +224,8 @@ Result<ocr_result_t> OcrAPI::ExtractTextCapture(const capture_result_t& cap)
     if (!raw_pix)
         return Err("Failed to convert image into Pix format");
 
-    // Preprocess: deskew + Sauvola binarize
-    // The result is 1bpp which makes Tesseract skip its own (worse) binarization
+    // Preprocess: dark-bg inversion, upscale, deskew.
+    // Returns grayscale so Tesseract's LSTM engine retains stroke-gradient info.
     PixPtr pix(preprocess_pix(raw_pix.get()));
     if (!pix)
         return Err("Failed to preprocess image");

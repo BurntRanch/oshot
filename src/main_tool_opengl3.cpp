@@ -213,8 +213,8 @@ int run_main_tool(const std::string& imgui_ini_path)
 
     if (!g_config->File.font.empty())
     {
-        const auto& path = get_font_path(g_config->File.font);
-        if (!path.empty())
+        const fs::path& path = get_font_path(g_config->File.font);
+        if (fs::exists(path))
             io.FontDefault =
                 io.Fonts->AddFontFromFileTTF(path.string().c_str(), 16.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
     }

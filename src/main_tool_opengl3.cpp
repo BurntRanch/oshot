@@ -211,12 +211,15 @@ int run_main_tool(const std::string& imgui_ini_path)
     io.IniFilename = imgui_ini_path.c_str();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    if (!g_config->File.font.empty())
+    for (const std::string& font : g_config->File.fonts)
     {
-        const fs::path& path = get_font_path(g_config->File.font);
-        if (fs::exists(path))
-            io.FontDefault =
-                io.Fonts->AddFontFromFileTTF(path.string().c_str(), 16.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+        const fs::path& path = get_font_path(font);
+        ImFont*         loaded_font =
+            io.Fonts->AddFontFromFileTTF(path.string().c_str(), 16.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+
+        // First successfully loaded font will remain the default.
+        if (!io.FontDefault)
+            io.FontDefault = loaded_font;
     }
 
     // Setup Platform/Renderer backends
